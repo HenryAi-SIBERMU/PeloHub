@@ -1,0 +1,7 @@
+{
+  "name": "Dysarthric Speech Research Dashboard",
+  "description": "A comprehensive research dashboard for Dysarthric Speech Recognition analysis, featuring model comparisons, EDA, and training efficiency metrics.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
