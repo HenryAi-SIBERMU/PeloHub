@@ -10,26 +10,33 @@ except ImportError:
 layers = keras.layers
 models = keras.models
 
+
 def create_lightweight_cnn(input_shape, num_classes=2): 
     """
-    Reconstructs the Custom CNN-STFT (PeloNet) architecture.
+    Standard Lightweight Architecture (~50k-150k Params).
+    Scaled up version with more filters for better capacity.
     """
     # Using Functional API for consistency
     inputs = layers.Input(shape=input_shape)
     
-    # Conv Block 1
+    # Conv Block 1: Basic Features
     x = layers.Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
     x = layers.MaxPooling2D((2, 2))(x)
     
-    # Conv Block 2
+    # Conv Block 2: Intermediate Features (Scaled Up to 64)
     x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+
+    # Conv Block 3: Advanced Features (New Block, Scaled Up to 128)
+    x = layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
     x = layers.MaxPooling2D((2, 2))(x)
     
     # Flatten & Dense
-    # Using GlobalAveragePooling2D to prevent shape issues with small feature maps (like 1x1)
-    # and to reduce parameters (Lightweight).
+    # Still using GAP for translation invariance
     x = layers.GlobalAveragePooling2D()(x)
-    x = layers.Dense(64, activation='relu')(x)
+    
+    # Larger Dense Layer for better decision boundary
+    x = layers.Dense(128, activation='relu')(x)
     x = layers.Dropout(0.5)(x)
     
     # Output
@@ -47,8 +54,12 @@ def create_transfer_learning_model(base_model_class, input_shape, num_classes=2,
     inputs = layers.Input(shape=input_shape)
     
     # Convert 1-channel MFCC to 3-channel (Required by ImageNet weights)
-    # Simply repeating the channel using Keras Layer (safer than tf.image op for Symbolic Tensors)
-    x = layers.Concatenate(axis=-1)([inputs, inputs, inputs]) 
+    # Convert 1-channel MFCC to 3-channel (Required by ImageNet weights)
+    # Check if input is 1 channel. If it's already 3 (or more), don't concatenate.
+    if input_shape[-1] == 1:
+        x = layers.Concatenate(axis=-1)([inputs, inputs, inputs])
+    else:
+        x = inputs 
     
     # Base Model
     # MobileNetV3/EfficientNet expect 3 channels. 

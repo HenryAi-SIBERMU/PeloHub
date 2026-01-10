@@ -27,8 +27,8 @@ AUDIO_MAX_LENGTH = (MFCC_MAX_LEN - 1) * STFT_STRIDE + STFT_WINDOW_SIZE
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001
-PATIENCE = 15 # Increased for thesis plots
-OPTIMIZER = 'adamax' # Best optimizer from Paper 3
+PATIENCE = 40 # Set to EPOCHS to effectively disable Early Stopping (Paper 2 logic)
+OPTIMIZER = 'adam' # Matched to Paper 2
 
 # Dataset Config
 # Command words to filter (Deprecated for Binary Class, kept empty)

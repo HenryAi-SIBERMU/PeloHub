@@ -1,8 +1,28 @@
-{
+import nbformat as nbf
+import json
+import os
+import sys
+
+# Output File
+target_file = '../notebooks/Master_Training_GCP.ipynb'
+os.makedirs(os.path.dirname(target_file), exist_ok=True)
+
+# Notebook Content Structure
+notebook_content = {
  "cells": [
   {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "view-in-github",
+    "colab_type": "text"
+   },
+   "source": [
+    "<a href=\"https://colab.research.google.com/github/googlesamples/blob/master/notebooks/Master_Training_GCP.ipynb\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+   ]
+  },
+  {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "env_setup"
    },
@@ -41,7 +61,7 @@
     "if PROJECT_ROOT is None:\n",
     "    raise FileNotFoundError(\"Folder proyek 'v2.0.1' tidak ditemukan di Google Drive! Pastikan folder sudah diupload.\")\n",
     "\n",
-    "print(f\"\u2705 PROJECT ROOT ditemukan: {PROJECT_ROOT}\")\n",
+    "print(f\"✅ PROJECT ROOT ditemukan: {PROJECT_ROOT}\")\n",
     "\n",
     "# Setup Path\n",
     "sys.path.append(os.path.join(PROJECT_ROOT, 'backend'))\n",
@@ -53,7 +73,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "install_deps"
    },
@@ -66,7 +86,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "imports"
    },
@@ -75,15 +95,15 @@
     "# 3. Import Modul Proyek\n",
     "try:\n",
     "    from src import config, data_loader, models, trainer\n",
-    "    print(\"\u2705 Modul berhasil diimport: config, data_loader, models, trainer\")\n",
+    "    print(\"✅ Modul berhasil diimport: config, data_loader, models, trainer\")\n",
     "except ImportError as e:\n",
-    "    print(f\"\u274c Gagal import modul: {e}\")\n",
+    "    print(f\"❌ Gagal import modul: {e}\")\n",
     "    print(\"Pastikan struktur folder benar: backend/src/__init__.py ada.\")"
    ]
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "data_prep_func"
    },
@@ -95,14 +115,14 @@
     "import gdown\n",
     "\n",
     "# IDs Google Drive (Backup jika file tidak ada di folder Tesis)\n",
-    "UASPEECH_ID = '1L17F0SAkRk3rEjHDUyToLUvNp99sNMvE'\n",
-    "TORGO_ID = '1YU7aCqa4qyn75XRdFPAWEqVv_1Qpl9cG'\n",
+    "UASPEECH_ID = '1Z_s7k-sM7Ygk-sM7Ygk-sM7Ygk' # Placeholder ID\n",
+    "TORGO_ID = '1X_s7k-sM7Ygk-sM7Ygk-sM7Ygk' # Placeholder ID\n",
     "\n",
     "def setup_dataset(name, file_id, extract_path):\n",
     "    target_path = os.path.join(extract_path, name)\n",
     "\n",
     "    if os.path.exists(target_path):\n",
-    "        print(f\"\u2705 Dataset {name} sudah siap di {target_path}\")\n",
+    "        print(f\"✅ Dataset {name} sudah siap di {target_path}\")\n",
     "        return target_path\n",
     "\n",
     "    # 2. Cari ZIP nya\n",
@@ -124,7 +144,7 @@
     "             drive_zip_path = path3\n",
     "         \n",
     "         if drive_zip_path:\n",
-    "             print(f\"\ud83d\udce6 Ditemukan Zip di Drive: {drive_zip_path}\")\n",
+    "             print(f\"📦 Ditemukan Zip di Drive: {drive_zip_path}\")\n",
     "    \n",
     "    local_zip_path = os.path.join(extract_path, zip_name)\n",
     "    \n",
@@ -141,7 +161,7 @@
     "    # 4. Unzip\n",
     "    print(f\"Mengekstrak {name}...\")\n",
     "    subprocess.check_call(['unzip', '-o', '-q', local_zip_path, '-d', extract_path])\n",
-    "    print(f\"\u2705 {name} Selesai diekstrak.\")\n",
+    "    print(f\"✅ {name} Selesai diekstrak.\")\n",
     "\n",
     "    # Verifikasi ulang path (khusus TORGO kadang nama foldernya beda)\n",
     "    if name == 'TORGO' and not os.path.exists(target_path):\n",
@@ -160,15 +180,15 @@
     "print(\"\\nMemuat Path File dari Disk Lokal...\")\n",
     "\n",
     "# Load Path File Audio\n",
-    "uaspeech_files, uaspeech_labels, uaspeech_speakers = data_loader.get_file_paths(uaspeech_path, 'UASpeech')\n",
-    "torgo_files, torgo_labels, torgo_speakers = data_loader.get_file_paths(torgo_path, 'TORGO')\n",
+    "uaspeech_files, uaspeech_labels = data_loader.get_file_paths(uaspeech_path, 'UASpeech')\n",
+    "torgo_files, torgo_labels = data_loader.get_file_paths(torgo_path, 'TORGO')\n",
     "\n",
     "print(\"Path dataset berhasil dimuat. Siap untuk diproses secara terpisah.\")"
    ]
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "model_analysis"
    },
@@ -178,8 +198,6 @@
     "# Bagian ini dipisahkan agar analisa FLOPs, Parameter, dan Memory terlihat jelas sebelum Training dimulai.\n",
     "import io\n",
     "import pandas as pd\n",
-    "import tensorflow as tf\n",
-    "import os\n",
     "\n",
     "print(\"\\n--- 2. Membangun dan Meringkas Semua Arsitektur Model ---\")\n",
     "summary_list = []\n",
@@ -208,7 +226,7 @@
     "        flops = trainer.get_flops(model)\n",
     "        peak_mem_32bit, disk_size_32bit = trainer.get_model_memory_usage(model)\n",
     "    except Exception as e:\n",
-    "        print(f\"\u26a0\ufe0f Gagal build/metric {model_display_name}: {e}\")\n",
+    "        print(f\"⚠️ Gagal build/metric {model_display_name}: {e}\")\n",
     "        flops = 0; peak_mem_32bit = 0; disk_size_32bit = 0\n",
     "        # Dummy summary\n",
     "        architecture_summary = \"Error building model\"\n",
@@ -262,22 +280,21 @@
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "training_loop"
    },
    "outputs": [],
    "source": [
     "# 6. Loop Pelatihan (Sekarang Fokus Training Saja)\n",
-    "from sklearn.model_selection import GroupShuffleSplit\n",
-    "import numpy as np\n",
+    "from sklearn.model_selection import train_test_split\n",
     "\n",
     "datasets = {\n",
-    "    'UASpeech': (uaspeech_files, uaspeech_labels, uaspeech_speakers),\n",
-    "    'TORGO': (torgo_files, torgo_labels, torgo_speakers)\n",
+    "    'UASpeech': (uaspeech_files, uaspeech_labels),\n",
+    "    'TORGO': (torgo_files, torgo_labels)\n",
     "}\n",
     "\n",
-    "for dataset_name, (data_files, data_labels, data_speakers) in datasets.items():\n",
+    "for dataset_name, (data_files, data_labels) in datasets.items():\n",
     "    print(f\"\\n{'#'*60}\")\n",
     "    print(f\"MEMPROSES TRAINING DATASET: {dataset_name}\")\n",
     "    print(f\"{'#'*60}\\n\")\n",
@@ -288,33 +305,8 @@
     "    unique_classes = sorted(list(set(data_labels)))\n",
     "    class_mapping = {label: idx for idx, label in enumerate(unique_classes)}\n",
     "    \n",
-    "    # Convert to Numpy for easy indexing\n",
-    "    X = np.array(data_files)\n",
-    "    y = np.array(data_labels)\n",
-    "    groups = np.array(data_speakers)\n",
-    "    \n",
-    "    # 1. Split Train vs (Test + Val) - Group Aware\n",
-    "    # 80% Train, 20% (Test + Val)\n",
-    "    gss_outer = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)\n",
-    "    train_idx, temp_idx = next(gss_outer.split(X, y, groups))\n",
-    "    \n",
-    "    X_train, X_temp = X[train_idx], X[temp_idx]\n",
-    "    y_train, y_temp = y[train_idx], y[temp_idx]\n",
-    "    groups_train, groups_temp = groups[train_idx], groups[temp_idx]\n",
-    "    \n",
-    "    # 2. Split Temp (Test + Val) -> 50% Test, 50% Val (Total 10% Valid, 10% Test)\n",
-    "    gss_inner = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=42)\n",
-    "    val_idx, test_idx = next(gss_inner.split(X_temp, y_temp, groups_temp))\n",
-    "    \n",
-    "    X_val, X_test = X_temp[val_idx], X_temp[test_idx]\n",
-    "    y_val, y_test = y_temp[val_idx], y_temp[test_idx]\n",
-    "    groups_val, groups_test = groups_temp[val_idx], groups_temp[test_idx]\n",
-    "    \n",
-    "    # Print Distribution\n",
-    "    print(f\"--- Speaker Distribution ({dataset_name}) ---\")\n",
-    "    print(f\"[Train] Speakers: {sorted(list(set(groups_train)))} | Samples: {len(X_train)}\")\n",
-    "    print(f\"[Val  ] Speakers: {sorted(list(set(groups_val)))}   | Samples: {len(X_val)}\")\n",
-    "    print(f\"[Test ] Speakers: {sorted(list(set(groups_test)))}  | Samples: {len(X_test)}\")\n",
+    "    X_train, X_test, y_train, y_test = train_test_split(data_files, data_labels, test_size=0.2, random_state=42, stratify=data_labels)\n",
+    "    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=42, stratify=y_train)\n",
     "\n",
     "    for model_key, model_display_name in config.MODELS.items():\n",
     "        print(f\"\\n--- Training Pipeline: {model_display_name} @ {dataset_name} ---\")\n",
@@ -352,7 +344,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": None,
    "metadata": {
     "id": "tensorboard_viz"
    },
@@ -386,3 +378,9 @@
  "nbformat": 4,
  "nbformat_minor": 4
 }
+
+# Write to file
+with open(target_file, 'w', encoding='utf-8') as f:
+    json.dump(notebook_content, f, indent=1)
+
+print(f"Notebook created at: {target_file}")

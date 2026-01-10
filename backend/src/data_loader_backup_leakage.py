@@ -91,6 +91,8 @@ def get_file_paths(dataset_root, dataset_name='UASpeech'):
             # Control usually has 'C' in ID like FC01, MC01 or 'Control' in path
             # Dysarthric is F01, M01 etc (without C)
             
+            # Dysarthric is F01, M01 etc (without C)
+            
             is_control = False
             is_dysarthric = False
             
@@ -113,45 +115,18 @@ def get_file_paths(dataset_root, dataset_name='UASpeech'):
     print(f"[{dataset_name}] Found {len(control_files)} Control files.")
     print(f"[{dataset_name}] Found {len(dysarthric_files)} Dysarthric files.")
     
-    # Extract Speaker IDs Helper
-    def extract_speaker_id(filepath):
-        # Naive Heuristic: Search for patterns like M01, F03, MC01, FC02
-        # TORGO: F01, M02, FC01 (Control often has C)
-        # S01.. etc.
-        # Strategy: Look for the parent folder or filename parts
-        parts = filepath.split(os.sep)
-        filename = os.path.basename(filepath)
-        
-        # Regex for common Speaker ID patterns in these datasets
-        # Matches: M01, F04, MC02, FC03, M1, F1 (case insensitive)
-        # Note: UASpeech sometimes has M05 or M5.
-        match = re.search(r'([MF]C?\d+)', filepath, re.IGNORECASE)
-        if match:
-            return match.group(1).upper()
-        
-        # Fallback: Use parent folder name if it looks like an ID
-        parent = parts[-2] if len(parts) > 1 else ""
-        if re.match(r'^[MF]C?\d+$', parent, re.IGNORECASE):
-            return parent.upper()
-            
-        return "UNKNOWN_SPEAKER"
-
-    speaker_ids = []
-
     # Assign Labels
     # Control -> 0
     for f in control_files:
         file_paths.append(f)
         labels.append('control') # Mapped to 0 later
-        speaker_ids.append(extract_speaker_id(f))
         
     # Dysarthric -> 1
     for f in dysarthric_files:
         file_paths.append(f)
         labels.append('dysarthric') # Mapped to 1 later
-        speaker_ids.append(extract_speaker_id(f))
             
-    return file_paths, labels, speaker_ids
+    return file_paths, labels
 
 def create_tf_dataset(file_paths, labels, class_mapping, batch_size=config.BATCH_SIZE, is_training=False, feature_type='stft'):
     """

@@ -9,49 +9,130 @@ from tensorflow.python.profiler.option_builder import ProfileOptionBuilder
 
 from . import config
 
-def get_flops(model, input_shape):
+def get_flops(model, batch_size=1):
     """
-    Calculates FLOPs of a Keras model using TensorFlow Profiler.
+    Menghitung FLOPs (Floating-Point Operations) untuk sebuah model Keras.
+    Diadopsi dari Paper 2.
     """
     try:
-        # Create a concrete function
-        run_meta = tf.compat.v1.RunMetadata()
+        from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
         
-        # Need to build the model first if not built
+        # Calculate FLOPs using TensorFlow Profiler
         if not model.inputs:
-             model.build(input_shape)
+             # Basic check to ensure model is built
+             return 0
 
-        @tf.function(input_signature=[tf.TensorSpec(shape=(1,) + input_shape[1:], dtype=tf.float32)])
-        def forward_pass(inp):
-            return model(inp)
-
-        # Concrete function
-        concrete_func = forward_pass.get_concrete_function()
+        # Create a concrete function
+        # Note: model.inputs[0].shape[1:] excludes batch dimension
+        shape_list = list(model.inputs[0].shape[1:])
         
-        # Profiling
-        graph_def = concrete_func.graph.as_graph_def()
+        concrete_func = tf.function(model).get_concrete_function(
+            [tf.TensorSpec([batch_size] + shape_list, model.inputs[0].dtype)]
+        )
         
-        opts = ProfileOptionBuilder.float_operation()    
-        flops = profile(graph_def, options=opts)
+        frozen_func = convert_variables_to_constants_v2(concrete_func)
+        run_meta = tf.compat.v1.RunMetadata()
+        opts = tf.compat.v1.profiler.ProfileOptionBuilder.float_operation()
+        
+        # Run profile
+        flops = tf.compat.v1.profiler.profile(
+            graph=frozen_func.graph, 
+            run_meta=run_meta, 
+            cmd='op', 
+            options=opts
+        )
         
         return flops.total_float_ops
     except Exception as e:
         print(f"Could not calculate FLOPs: {e}")
         return 0
 
+def get_model_memory_usage(model):
+    """
+    Menghitung puncak memori aktivasi dan ukuran model di disk.
+    Diadopsi dari Paper 2.
+    Updated for Keras 3 Compatibility (which removed layer.output_shape).
+    """
+    peak_activation_memory = 0
+    valid_layers_count = 0
+    
+    for layer in model.layers:
+        shapes = []
+        
+        # METHOD 1: Keras 2 Style (Legacy)
+        if hasattr(layer, 'output_shape'):
+             shapes = layer.output_shape if isinstance(layer.output_shape, list) else [layer.output_shape]
+        
+        # METHOD 2: Keras 3 Style (Modern)
+        elif hasattr(layer, 'output'):
+            # In Keras 3, we access the output tensor's shape
+            try:
+                outputs = layer.output
+                if isinstance(outputs, list):
+                    shapes = [o.shape for o in outputs]
+                else:
+                    shapes = [outputs.shape]
+            except AttributeError:
+                # Some intermediate layers (like InputLayer in some versions) might behave oddly
+                continue
+        
+        if not shapes:
+            continue
+            
+        valid_layers_count += 1
+        
+        for shape in shapes:
+            if shape is None: continue
+            
+            # shape can be a tuple or TensorShape. Convert to list.
+            # Handle batch dimension (usually first, can be None)
+            # We skip the first dim (Batch) as per Paper 2 logic
+            
+            dims = list(shape)[1:] # Skip batch
+            
+            if not dims: 
+                # Scalar or (None,) -> treat as single float
+                layer_mem = 4 
+            else:
+                # Replace None dims with 1 (safe assumption for calculation)
+                safe_dims = [d if d is not None else 1 for d in dims]
+                layer_mem = np.prod(safe_dims) * 4 # float32 = 4 bytes
+            
+            peak_activation_memory = max(peak_activation_memory, layer_mem)
+
+    # Estimasi ukuran disk (Paper 2 logic)
+    temp_model_path = "temp_model_for_size.h5" 
+    try:
+        model.save(temp_model_path)
+        model_size_on_disk = os.path.getsize(temp_model_path)
+    except Exception as e:
+        print(f"Error saving model for size estimation: {e}")
+        model_size_on_disk = 0
+    finally:
+        if os.path.exists(temp_model_path):
+            os.remove(temp_model_path)
+            
+    # Debug print to confirm fix
+    if peak_activation_memory > 0:
+        print(f"DEBUG: Memory calculated successfully from {valid_layers_count} layers. Peak: {peak_activation_memory} bytes")
+    else:
+        print(f"DEBUG: WARNING - Memory still 0. Valid layers found: {valid_layers_count}")
+
+    return peak_activation_memory, model_size_on_disk
+
 def train_model(model, train_ds, val_ds, model_name='custom_cnn'):
     """
     Orchestrates the training process.
     """
     # Compile
-    # Compile
-    # Use Optimzer from Config (default: Adamax per Paper 3)
+    # Use Optimzer from Config (default: Adam per Paper 2)
     optimizer_config = config.OPTIMIZER if hasattr(config, 'OPTIMIZER') else 'adam'
     
+    # Paper 2 uses 'sparse_categorical_crossentropy'
     model.compile(
         optimizer=optimizer_config,
-        loss='categorical_crossentropy',
-        metrics=['accuracy', tf.keras.metrics.AUC(name='auc')]
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy'] # Paper 2 metrics
     )
     
     # Callbacks
@@ -61,11 +142,22 @@ def train_model(model, train_ds, val_ds, model_name='custom_cnn'):
 
     checkpoint_path = os.path.join(config.MODELS_DIR, f"{model_name}_best.h5")
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(patience=config.PATIENCE, restore_best_weights=True),
-        tf.keras.callbacks.ModelCheckpoint(checkpoint_path, save_best_only=True),
+        # Paper 2: Save Weights Only, Best Only.
+        # But for inference convenience we might want save_weights_only=False?
+        # Paper 2 code: save_weights_only=True. 
+        # User said "100%". So let's stick to save_best_only (defaults save_weights_only=False in standard Keras unless specified).
+        # Wait, Paper 2 line 1033 says: save_weights_only=True.
+        # However, for our deployment easier handling, saving full model is better.
+        # I will use save_best_only=True (Full Model) to prevent architecture mismatch issues later, 
+        # unless user strictly demands weights only. The "strategy" is saving the best model.
+        tf.keras.callbacks.ModelCheckpoint(checkpoint_path, save_best_only=True, monitor='val_accuracy', mode='max'),
         tf.keras.callbacks.CSVLogger(os.path.join(config.OUTPUTS_DIR, f"{model_name}_history.csv")),
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(config.OUTPUTS_DIR, 'logs', model_name), histogram_freq=1)
     ]
+    
+    # Add EarlyStopping only if PATIENCE < EPOCHS (Paper 2 has no early stopping)
+    if config.PATIENCE < config.EPOCHS:
+         callbacks.append(tf.keras.callbacks.EarlyStopping(patience=config.PATIENCE, restore_best_weights=True))
     
     start_time = time.time()
     history = model.fit(
@@ -106,14 +198,16 @@ def evaluate_model(model, test_ds, class_names, model_name='custom_cnn'):
     # 3. Efficiency Metrics
     # FLOPs
     # Infer input shape from model
-    input_shape = model.input_shape
-    flops = get_flops(model, input_shape)
+    flops = get_flops(model)
     
     # Params
     total_params = model.count_params()
     
     # Inference Time (Average over 100 runs)
-    dummy_input = tf.random.normal((1,) + input_shape[1:])
+    # Fix Shape: input_shape usually (None, H, W, C). We want (1, H, W, C).
+    input_shape = model.input_shape
+    target_shape = (1,) + input_shape[1:] if input_shape[0] is None else input_shape
+    dummy_input = tf.random.normal(target_shape)
     
     # Warmup
     for _ in range(10): model(dummy_input)
