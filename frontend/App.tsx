@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import Sidebar from './components/Sidebar';
+import PageTransition from './components/PageTransition';
 import Dashboard from './pages/Dashboard';
 import EDADashboard from './pages/EDADashboard';
 import ModelEvaluation from './pages/ModelEvaluation';
@@ -17,7 +19,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
     <div className="flex h-screen w-full bg-[#f6f6f8] dark:bg-[#101622] overflow-hidden font-display">
       {/* Sidebar for Desktop */}
       <Sidebar />
-      
+
       {/* Main Content Area */}
       <div className="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header (Hidden on Desktop) */}
@@ -30,7 +32,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-[#101622] scroll-smooth">
-          <div className="max-w-7xl mx-auto w-full">
+          <div className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8">
             {children}
           </div>
         </div>
@@ -41,6 +43,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
 const AppContent = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const location = useLocation();
 
   const addLogEntry = (log: LogEntry) => {
     setLogs(prev => [log, ...prev]);
@@ -52,16 +55,50 @@ const AppContent = () => {
 
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/eda" element={<EDADashboard />} />
-        <Route path="/evaluation" element={<ModelEvaluation />} />
-        <Route path="/training" element={<TrainingEfficiency />} />
-        <Route path="/prediction" element={<LivePrediction onAnalysisComplete={addLogEntry} />} />
-        <Route path="/logs" element={<AnalysisLogs logs={logs} onClear={clearLogs} />} />
-        <Route path="/build-engine" element={<BuildEngine />} />
-        <Route path="/documentation" element={<Documentation />} />
-      </Routes>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={
+            <PageTransition>
+              <Dashboard />
+            </PageTransition>
+          } />
+          <Route path="/eda" element={
+            <PageTransition>
+              <EDADashboard />
+            </PageTransition>
+          } />
+          <Route path="/evaluation" element={
+            <PageTransition>
+              <ModelEvaluation />
+            </PageTransition>
+          } />
+          <Route path="/training" element={
+            <PageTransition>
+              <TrainingEfficiency />
+            </PageTransition>
+          } />
+          <Route path="/prediction" element={
+            <PageTransition>
+              <LivePrediction onAnalysisComplete={addLogEntry} />
+            </PageTransition>
+          } />
+          <Route path="/logs" element={
+            <PageTransition>
+              <AnalysisLogs logs={logs} onClear={clearLogs} />
+            </PageTransition>
+          } />
+          <Route path="/build-engine" element={
+            <PageTransition>
+              <BuildEngine />
+            </PageTransition>
+          } />
+          <Route path="/documentation" element={
+            <PageTransition>
+              <Documentation />
+            </PageTransition>
+          } />
+        </Routes>
+      </AnimatePresence>
     </Layout>
   );
 };

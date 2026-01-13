@@ -1,28 +1,42 @@
-# Menggunakan Image Python yang Ringan
-FROM python:3.9-slim
+# Multi-stage build for smaller final image
+FROM python:3.10-slim as builder
 
-# Set Environment Variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set Direktori Kerja
+# Set working directory
 WORKDIR /app
 
-# Install System Dependencies (Libsndfile diperlukan untuk pemrosesan audio jika library tertentu membutuhkannya)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    libsndfile1 \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Requirements dan Install Python Dependencies
+# Copy requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy Seluruh Source Code Backend
+# Install Python dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Production stage
+FROM python:3.10-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
 COPY . .
 
-# Expose Port 8080 (Cloud Run Default)
-EXPOSE 8080
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
 
-# Command untuk menjalankan aplikasi
-# Cloud Run akan menginject variable PORT, jadi kita bind ke 0.0.0.0:$PORT
-CMD ["sh", "-c", "uvicorn app_api:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/status')" || exit 1
+
+# Run the application
+CMD ["uvicorn", "app_api:app", "--host", "0.0.0.0", "--port", "8000"]

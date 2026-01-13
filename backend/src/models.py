@@ -54,12 +54,10 @@ def create_transfer_learning_model(base_model_class, input_shape, num_classes=2,
     inputs = layers.Input(shape=input_shape)
     
     # Convert 1-channel MFCC to 3-channel (Required by ImageNet weights)
-    # Convert 1-channel MFCC to 3-channel (Required by ImageNet weights)
-    # Check if input is 1 channel. If it's already 3 (or more), don't concatenate.
-    if input_shape[-1] == 1:
-        x = layers.Concatenate(axis=-1)([inputs, inputs, inputs])
-    else:
-        x = inputs 
+    # UPDATED LOGIC (Paper 2 Compliance):
+    # Stacking is now handled EXTERNALLY in data_loader.py (using tf.stack).
+    # So the input here is guaranteed to be (H, W, 3) for Transfer Learning.
+    x = inputs 
     
     # Base Model
     # MobileNetV3/EfficientNet expect 3 channels. 

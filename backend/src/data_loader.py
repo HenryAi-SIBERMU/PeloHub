@@ -163,20 +163,31 @@ def create_tf_dataset(file_paths, labels, class_mapping, batch_size=config.BATCH
     # Create dataset of paths/labels
     dataset = tf.data.Dataset.from_tensor_slices((file_paths, label_indices))
     
-    # Map to load audio and preprocess (STFT or MFCC)
-    def _map_func(path, label):
-        # Pass feature_type to loading function
-        features = preprocessing.load_and_preprocess_wav(path, feature_type=feature_type)
+    # Map preprocessing function
+    def process_path(file_path, label):
+        # Load and preprocess
+        # Output shape from preprocessing: (Height, Width, 1) -> Already has Channel dim
+        features = preprocessing.load_and_preprocess_wav(file_path, feature_type=feature_type)
         
-        # Sparse Categorical Crossentropy expects integer labels, not One-Hot
-        # label_one_hot = tf.one_hot(label, depth=len(class_mapping))
+        # Add channel dimension logic
+        if feature_type == 'mfcc':
+            # MFCC comes as (F, T, 1). We need (F, T, 3) for Transfer Learning.
+            # Use CONCAT, not STACK. 
+            # (F,T,1) + (F,T,1) + (F,T,1) -> (F,T,3) via concat axis -1.
+            features = tf.concat([features, features, features], axis=-1)
+        else:
+            # CNN-STFT expects (F, T, 1). 
+            # Preprocessing already returns (F, T, 1), so do NOTHING.
+            pass
+            
         return features, label
-
-    dataset = dataset.map(_map_func, num_parallel_calls=tf.data.AUTOTUNE)
+    
+    dataset = dataset.map(process_path, num_parallel_calls=tf.data.AUTOTUNE)
     
     if is_training:
         dataset = dataset.shuffle(buffer_size=1000)
     
     dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    
     return dataset
