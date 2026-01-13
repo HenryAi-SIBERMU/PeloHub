@@ -387,6 +387,30 @@ async def get_evaluation_details():
         print(f"Error Eval API: {e}")
         return {"error": str(e)}
 
+# ========== DATASET & EDA ENDPOINTS ==========
+@app.get("/api/dataset/eda-samples")
+async def get_eda_samples():
+    """
+    Serve EDA samples JSON (audio metadata, waveform, spectrogram)
+    """
+    try:
+        eda_path = os.path.join(config.OUTPUTS_DIR, "eda_samples.json")
+        if os.path.exists(eda_path):
+            with open(eda_path, 'r', encoding='utf-8') as f:
+                import json
+                return json.load(f)
+        else:
+            return {"error": "eda_samples.json not found", "uaspeech": {"dysarthric": [], "control": []}, "torgo": {"dysarthric": [], "control": []}}
+    except Exception as e:
+        print(f"Error loading EDA samples: {e}")
+        return {"error": str(e)}
+
+# Mount static files for audio samples
+from fastapi.staticfiles import StaticFiles
+samples_dir = os.path.join(config.OUTPUTS_DIR, "samples")
+if os.path.exists(samples_dir):
+    app.mount("/static/samples", StaticFiles(directory=samples_dir), name="samples")
+
 if __name__ == "__main__":
     import uvicorn
     # Menjalankan server lokal (Dev Mode)

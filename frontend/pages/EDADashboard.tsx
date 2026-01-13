@@ -63,7 +63,7 @@ const DATASETS: Record<DatasetKey, DatasetConfig> = {
 
 const EDADashboard: React.FC = () => {
     const navigate = useNavigate();
-    const [activeDataset, setActiveDataset] = useState<DatasetKey>('torgo');
+    const [activeDataset, setActiveDataset] = useState<DatasetKey>('uaspeech');
     const [activeCategory, setActiveCategory] = useState<'dysarthric' | 'control'>('dysarthric');
     const [datasets, setDatasets] = useState<Record<DatasetKey, DatasetConfig>>(DATASETS);
     const [selectedFile, setSelectedFile] = useState<AudioFile | null>(null);
@@ -78,28 +78,50 @@ const EDADashboard: React.FC = () => {
     useEffect(() => {
         const fetchAll = async () => {
             try {
-                // 1. Stats
-                const resStats = await fetch('http://localhost:8000/api/dataset/stats');
-                const statsJson = await resStats.json();
-
-                // 2. Samples
-                const resSamples = await fetch('http://localhost:8000/api/dataset/samples');
+                console.log('🔍 Fetching EDA samples from backend...');
+                // Fetch EDA Samples (audio files with waveform & spectrogram)
+                const resSamples = await fetch('http://localhost:8000/api/dataset/eda-samples');
                 const samplesJson = await resSamples.json();
+                console.log('✅ Received data:', samplesJson);
 
                 setDatasets(prev => {
                     const next = { ...prev };
-                    // Merge Stats
-                    if (statsJson.torgo) next.torgo = { ...next.torgo, ...statsJson.torgo };
-                    if (statsJson.uaspeech) next.uaspeech = { ...next.uaspeech, ...statsJson.uaspeech };
 
-                    // Merge Samples if available
-                    if (samplesJson.torgo) next.torgo.files = samplesJson.torgo;
-                    if (samplesJson.uaspeech) next.uaspeech.files = samplesJson.uaspeech;
+                    // Merge Samples
+                    if (samplesJson.torgo) {
+                        console.log('📊 TORGO data:', samplesJson.torgo);
+                        next.torgo.files = samplesJson.torgo;
+                        // Update stats if available
+                        if (samplesJson.torgo.dysarthric && samplesJson.torgo.control) {
+                            const totalSamples = samplesJson.torgo.dysarthric.length + samplesJson.torgo.control.length;
+                            next.torgo.stats.samples = totalSamples.toString();
+                            next.torgo.stats.classes = '2';
+                            console.log(`  TORGO: ${totalSamples} samples`);
+                        }
+                    }
+                    if (samplesJson.uaspeech) {
+                        console.log('📊 UASpeech data:', samplesJson.uaspeech);
+                        next.uaspeech.files = samplesJson.uaspeech;
+                        // Update stats if available
+                        if (samplesJson.uaspeech.dysarthric && samplesJson.uaspeech.control) {
+                            const totalSamples = samplesJson.uaspeech.dysarthric.length + samplesJson.uaspeech.control.length;
+                            next.uaspeech.stats.samples = totalSamples.toString();
+                            next.uaspeech.stats.classes = '2';
+                            console.log(`  UASpeech: ${totalSamples} samples`);
+                        }
+                        // Update specs from first file if available
+                        const firstFile = samplesJson.uaspeech.dysarthric[0] || samplesJson.uaspeech.control[0];
+                        if (firstFile && firstFile.specs) {
+                            next.uaspeech.specs = firstFile.specs;
+                            console.log('  Audio specs updated:', firstFile.specs);
+                        }
+                    }
 
+                    console.log('📦 Final merged data:', next);
                     return next;
                 });
             } catch (e) {
-                console.error("Failed to load EDA data:", e);
+                console.error("❌ Failed to load EDA data:", e);
             }
         };
         fetchAll();
