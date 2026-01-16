@@ -89,7 +89,7 @@ const EDADashboard: React.FC = () => {
         const fetchAll = async () => {
             try {
                 console.log('🔍 Fetching EDA samples from backend...');
-                const resSamples = await fetch('/api/api/dataset/eda-samples');
+                const resSamples = await fetch('/api/dataset/eda-samples');
                 const samplesJson = await resSamples.json();
                 console.log('✅ Received data:', samplesJson);
 

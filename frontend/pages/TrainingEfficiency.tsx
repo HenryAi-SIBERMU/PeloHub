@@ -9,7 +9,7 @@ const useEvaluationData = () => {
     useEffect(() => {
         const fetchIt = async () => {
             try {
-                const res = await fetch('/api/api/evaluation/details');
+                const res = await fetch('/api/evaluation/details');
                 const json = await res.json();
                 setData(json);
             } catch (e) {

@@ -50,7 +50,7 @@ const useEvaluationData = (selectedDataset: string) => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const res = await fetch('/api/api/evaluation/details');
+                const res = await fetch('/api/evaluation/details');
                 const json = await res.json();
 
                 // Debug log
