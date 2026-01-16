@@ -1,45 +1,45 @@
 {
     "model_name": "cnn_stft_TORGO",
     "dataset": "Combined_UASpeech_TORGO",
-    "accuracy": 0.855,
+    "accuracy": 0.835,
     "flops": 561093068,
     "params": 110498,
-    "inference_time_ms": 13.170037269592285,
+    "inference_time_ms": 12.8275465965271,
     "classification_report": {
         "control": {
-            "precision": 0.7795275590551181,
-            "recall": 0.99,
-            "f1-score": 0.8722466960352423,
+            "precision": 0.8073394495412844,
+            "recall": 0.88,
+            "f1-score": 0.8421052631578947,
             "support": 100.0
         },
         "dysarthric": {
-            "precision": 0.9863013698630136,
-            "recall": 0.72,
-            "f1-score": 0.8323699421965318,
+            "precision": 0.8681318681318682,
+            "recall": 0.79,
+            "f1-score": 0.8272251308900523,
             "support": 100.0
         },
-        "accuracy": 0.855,
+        "accuracy": 0.835,
         "macro avg": {
-            "precision": 0.8829144644590659,
-            "recall": 0.855,
-            "f1-score": 0.8523083191158871,
+            "precision": 0.8377356588365763,
+            "recall": 0.835,
+            "f1-score": 0.8346651970239736,
             "support": 200.0
         },
         "weighted avg": {
-            "precision": 0.8829144644590659,
-            "recall": 0.855,
-            "f1-score": 0.8523083191158871,
+            "precision": 0.8377356588365763,
+            "recall": 0.835,
+            "f1-score": 0.8346651970239735,
             "support": 200.0
         }
     },
     "confusion_matrix": [
         [
-            99,
-            1
+            88,
+            12
         ],
         [
-            28,
-            72
+            21,
+            79
         ]
     ]
 }

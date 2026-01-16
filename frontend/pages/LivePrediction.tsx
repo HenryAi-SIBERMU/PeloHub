@@ -356,9 +356,9 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
     // 1. Map Frontend ID to Backend Model Parameter
     const modelMap: Record<string, string> = {
       'cnn': 'cnn_stft',
-      'mobilenet': 'mobilenet',
-      'resnet': 'resnet',
-      'vgg': 'vgg'
+      'mobilenet': 'mobilenetv3',
+      'resnet': 'efficientnetb0',
+      'vgg': 'nasnetmobile'
     };
     const backendModelName = modelMap[selectedModelId] || selectedModelId;
 
@@ -369,7 +369,7 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
 
     try {
       // 3. Send Request to Real Backend
-      const response = await fetch(`http://localhost:8000/predict/${backendModelName}`, {
+      const response = await fetch(`/api/predict/${backendModelName}`, {
         method: 'POST',
         body: formData,
       });
@@ -443,7 +443,7 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
 
     } catch (error) {
       console.error("Prediction Error:", error);
-      alert("Gagal terhubung ke Backend API.\nPastikan server berjalan di http://localhost:8000");
+      alert("Gagal terhubung ke Backend API.\nPastikan server berjalan dan dapat diakses.");
       setAnalysisState('idle');
     }
   };
@@ -594,10 +594,17 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
 
               {/* Header & Controls */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">equalizer</span>
-                  {t('live.signal_analysis')}
-                </h3>
+                <div className="flex flex-col gap-1">
+                  <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">equalizer</span>
+                    {t('live.signal_analysis')}
+                  </h3>
+                  {selectedFile && (
+                    <p className="text-xs text-slate-500 font-mono pl-7 max-w-md truncate" title={selectedFile.name}>
+                      {selectedFile.name}
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{fileMetadata.format}</span>
                   <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{fileMetadata.bitDepth}</span>
@@ -795,8 +802,8 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
                     <div>
                       <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">{t('live.severity')}</p>
                       <p className={`text-xl font-bold ${result?.severity === 'High' ? 'text-red-600' :
-                          result?.severity === 'Mid' ? 'text-orange-500' :
-                            result?.severity === 'Low' ? 'text-yellow-500' : 'text-slate-400'
+                        result?.severity === 'Mid' ? 'text-orange-500' :
+                          result?.severity === 'Low' ? 'text-yellow-500' : 'text-slate-400'
                         }`}>
                         {result ? (
                           result.severity === 'High' ? t('gen.high') :

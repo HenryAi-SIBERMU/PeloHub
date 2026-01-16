@@ -37,7 +37,8 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - BACKEND_URL=http://dysarthria-backend:8000
+      - PORT=80 # Internal Nginx Port
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health" ]
       interval: 30s

@@ -157,12 +157,14 @@ async def predict_audio(model_name: str, file: UploadFile = File(...)):
             features = preprocessing.get_spectrogram(audio_tensor)
         else:
             features = preprocessing.get_mfcc(audio_tensor)
+            # Transfer learning models expect 3 channels (RGB), replicate grayscale to RGB
+            features = tf.repeat(features, 3, axis=-1)  # (40, 174, 1) -> (40, 174, 3)
             
         # Tambahkan batch dimension (Model expect inputs: [Batch, H, W, C])
         # Current logic di preprocessing bisa saja sudah add batch jika pakai logic lama,
         # Kita cek shape. preprocessing.get_spectrogram outputs (174, 27, 1)
         
-        features = tf.expand_dims(features, axis=0) # Shape: (1, 174, 27, 1)
+        features = tf.expand_dims(features, axis=0) # Shape: (1, 174, 27, 1) or (1, 40, 174, 3)
         
         # DEBUG DEEP: Cek input yang masuk ke model
         feat_chk = features.numpy()

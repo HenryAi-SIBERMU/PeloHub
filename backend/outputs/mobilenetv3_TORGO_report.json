@@ -1,27 +1,27 @@
 {
     "control": {
-        "precision": 0.7959183673469388,
-        "recall": 0.78,
-        "f1-score": 0.7878787878787878,
+        "precision": 0.8131868131868132,
+        "recall": 0.74,
+        "f1-score": 0.774869109947644,
         "support": 100.0
     },
     "dysarthric": {
-        "precision": 0.7843137254901961,
-        "recall": 0.8,
-        "f1-score": 0.7920792079207921,
+        "precision": 0.7614678899082569,
+        "recall": 0.83,
+        "f1-score": 0.7942583732057417,
         "support": 100.0
     },
-    "accuracy": 0.79,
+    "accuracy": 0.785,
     "macro avg": {
-        "precision": 0.7901160464185675,
-        "recall": 0.79,
-        "f1-score": 0.78997899789979,
+        "precision": 0.787327351547535,
+        "recall": 0.7849999999999999,
+        "f1-score": 0.7845637415766928,
         "support": 200.0
     },
     "weighted avg": {
-        "precision": 0.7901160464185674,
-        "recall": 0.79,
-        "f1-score": 0.7899789978997899,
+        "precision": 0.787327351547535,
+        "recall": 0.785,
+        "f1-score": 0.7845637415766927,
         "support": 200.0
     }
 }

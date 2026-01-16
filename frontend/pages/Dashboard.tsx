@@ -13,7 +13,7 @@ const Dashboard: React.FC = () => {
     React.useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('http://localhost:8000/api/engine/overview');
+                const response = await fetch('/api/api/engine/overview');
                 const json = await response.json();
                 setData(json);
             } catch (error) {

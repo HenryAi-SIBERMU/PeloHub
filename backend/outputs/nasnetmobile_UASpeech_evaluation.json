@@ -1,45 +1,45 @@
 {
     "model_name": "nasnetmobile_UASpeech",
     "dataset": "Combined_UASpeech_TORGO",
-    "accuracy": 0.8947368421052632,
+    "accuracy": 0.9223907225691347,
     "flops": 202363388,
     "params": 4405270,
-    "inference_time_ms": 638.8570189476013,
+    "inference_time_ms": 609.8344469070435,
     "classification_report": {
         "control": {
-            "precision": 0.8455538221528861,
-            "recall": 0.966131907308378,
-            "f1-score": 0.9018302828618968,
+            "precision": 0.9128919860627178,
+            "recall": 0.9340463458110517,
+            "f1-score": 0.9233480176211454,
             "support": 561.0
         },
         "dysarthric": {
-            "precision": 0.9604166666666667,
-            "recall": 0.8232142857142857,
-            "f1-score": 0.8865384615384615,
+            "precision": 0.9323583180987203,
+            "recall": 0.9107142857142857,
+            "f1-score": 0.9214092140921409,
             "support": 560.0
         },
-        "accuracy": 0.8947368421052632,
+        "accuracy": 0.9223907225691347,
         "macro avg": {
-            "precision": 0.9029852444097763,
-            "recall": 0.8946730965113319,
-            "f1-score": 0.8941843722001792,
+            "precision": 0.922625152080719,
+            "recall": 0.9223803157626687,
+            "f1-score": 0.9223786158566432,
             "support": 1121.0
         },
         "weighted avg": {
-            "precision": 0.9029340120973259,
-            "recall": 0.8947368421052632,
-            "f1-score": 0.8941911928162913,
+            "precision": 0.9226164695062159,
+            "recall": 0.9223907225691347,
+            "f1-score": 0.9223794806218211,
             "support": 1121.0
         }
     },
     "confusion_matrix": [
         [
-            542,
-            19
+            524,
+            37
         ],
         [
-            99,
-            461
+            50,
+            510
         ]
     ]
 }

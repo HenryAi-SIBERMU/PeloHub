@@ -5,14 +5,13 @@ from . import config
 
 def get_spectrogram(audio):
     """
-    Computes STFT Spectrogram.
-    Output Shape: (Time, Freq, 1) -> e.g. (99, 161, 1)
+    Computes Mel Spectrogram (Paper 2 Spec: 27 Mel Bins, No Pooling).
+    Output Shape: (Time, Freq, 1) -> (174, 27, 1)
     """
-    # 1. Padding/Trimming (Now ~3.5s to match Paper 2 duration)
+    # 1. Padding/Trimming to match Paper 2 duration (~5.6s)
     target_len = config.AUDIO_MAX_LENGTH
     input_len = tf.shape(audio)[0]
     
-    # Simple check for padding
     if input_len > target_len:
         audio = audio[:target_len]
     else:
@@ -25,42 +24,40 @@ def get_spectrogram(audio):
     audio = audio / (tf.math.reduce_max(tf.math.abs(audio)) + 1e-6)
     
     # 3. STFT
-    spectrogram = tf.signal.stft(
+    stft = tf.signal.stft(
         audio, 
         frame_length=config.STFT_WINDOW_SIZE, 
         frame_step=config.STFT_STRIDE,
         fft_length=config.N_FFT
     )
+    spectrogram = tf.abs(stft)
     
-    # 4. Magnitude & Log
-    spectrogram = tf.abs(spectrogram)
-    spectrogram = tf.expand_dims(spectrogram, -1)
-    spectrogram = tf.math.log(spectrogram + 1e-6)
-    
-    # 5. Pooling matches old PeloNet logic matches Tesis v0.1.
-    # We need to temporarily add a Batch Dimension because tf.nn.pool requires Rank 4 (N, T, F, C).
-    # Current Shape: (Time, Freq, 1) -> Rank 3.
-    
-    spectrogram = tf.expand_dims(spectrogram, 0) # Shape: (1, Time, Freq, 1)
-    
-    spectrogram = tf.nn.pool(
-        input=spectrogram,
-        window_shape=[1, 6],
-        strides=[1, 6],
-        pooling_type='AVG',
-        padding='SAME'
+    # 4. Convert to Mel Scale (Paper 2: 27 Mel Bins)
+    num_spectrogram_bins = stft.shape[-1]
+    linear_to_mel_weight_matrix = tf.signal.linear_to_mel_weight_matrix(
+        num_mel_bins=27,  # Paper 2 spec
+        num_spectrogram_bins=num_spectrogram_bins,
+        sample_rate=config.SAMPLE_RATE,
+        lower_edge_hertz=20.0,
+        upper_edge_hertz=config.SAMPLE_RATE / 2.0
     )
+    mel_spectrogram = tf.tensordot(spectrogram, linear_to_mel_weight_matrix, 1)
+    mel_spectrogram.set_shape(spectrogram.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))
     
-    spectrogram = tf.squeeze(spectrogram, axis=0) # Shape: (Time, Freq, 1)
+    # 5. Log Scale
+    mel_spectrogram = tf.math.log(mel_spectrogram + 1e-6)
     
-    return spectrogram
+    # 6. Add Channel Dimension -> (Time, Freq, 1)
+    mel_spectrogram = tf.expand_dims(mel_spectrogram, -1)
+    
+    return mel_spectrogram
 
 def get_mfcc(audio):
     """
-    Computes MFCCs using TensorFLow. Matches Paper 2 (40 MFCCs).
+    Computes MFCCs using TensorFlow. Matches Paper 2 (40 MFCCs).
     Output Shape: (N_MFCC, Time, 1) -> (40, 174, 1)
     """
-    # 1. Pad/Trim to approx 3.5s
+    # 1. Pad/Trim to approx 5.6s
     target_len = config.AUDIO_MAX_LENGTH
     
     # Get current length

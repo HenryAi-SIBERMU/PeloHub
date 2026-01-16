@@ -89,7 +89,7 @@ const EDADashboard: React.FC = () => {
         const fetchAll = async () => {
             try {
                 console.log('🔍 Fetching EDA samples from backend...');
-                const resSamples = await fetch('http://localhost:8000/api/dataset/eda-samples');
+                const resSamples = await fetch('/api/api/dataset/eda-samples');
                 const samplesJson = await resSamples.json();
                 console.log('✅ Received data:', samplesJson);
 
@@ -197,7 +197,7 @@ const EDADashboard: React.FC = () => {
         if (playingType === 'none' || !selectedPair) return;
 
         const file = playingType === 'control' ? selectedPair.control : selectedPair.dysarthric;
-        const url = file.url ? `http://localhost:8000${file.url}` : "";
+        const url = file.url ? `/api${file.url}` : "";
 
         if (url) {
             const audio = new Audio(url);

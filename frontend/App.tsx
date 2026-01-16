@@ -15,17 +15,27 @@ import { LogEntry } from './types';
 import { LanguageProvider } from './contexts/LanguageContext';
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   return (
     <div className="flex h-screen w-full bg-[#f6f6f8] dark:bg-[#101622] overflow-hidden font-display">
-      {/* Sidebar for Desktop */}
-      <Sidebar />
+      {/* Sidebar (Desktop & Mobile) */}
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content Area */}
       <div className="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden">
         {/* Mobile Header (Hidden on Desktop) */}
         <div className="md:hidden flex items-center justify-between p-4 bg-white dark:bg-card-dark border-b border-gray-200 dark:border-gray-800 z-50">
-          <span className="font-bold text-slate-900 dark:text-white">Dysarthria AI</span>
-          <button className="p-2 text-slate-600 dark:text-white">
+          <div className="flex items-center gap-2">
+            <div className="size-6 rounded bg-primary flex items-center justify-center text-white">
+              <span className="material-symbols-outlined text-sm">graphic_eq</span>
+            </div>
+            <span className="font-bold text-slate-900 dark:text-white">PeloHub</span>
+          </div>
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 text-slate-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+          >
             <span className="material-symbols-outlined">menu</span>
           </button>
         </div>

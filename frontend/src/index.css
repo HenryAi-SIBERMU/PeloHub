@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #135bec;
+  --color-background-light: #f6f6f8;
+  --color-background-dark: #101622;
+  --color-surface-dark: #1e2229;
+  --color-surface-highlight: #282e39;
+  --color-card-dark: #282e39;
+  --color-card-light: #ffffff;
+  
+  --font-display: "Inter", sans-serif;
+  --font-body: "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--color-background-dark);
+}
+
+/* Custom scrollbar hide */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Accordion transition styles */
+details > summary {
+    list-style: none;
+}
+details > summary::-webkit-details-marker {
+    display: none;
+}

@@ -2,25 +2,25 @@
     "Lightweight CNN-STFT (Proposed)": {
         "params": "110498",
         "flops": "3398205004",
-        "size": "122.47 MB",
+        "size": "0.12 MB",
         "activation": "5573.44 KB"
     },
     "MobileNetV3Small (Benchmark)": {
         "params": "1013234",
         "flops": "22000996",
-        "size": "1110.67 MB",
+        "size": "1.08 MB",
         "activation": "34.80 KB"
     },
     "EfficientNetB0 (Benchmark)": {
         "params": "4213797",
         "flops": "148230643",
-        "size": "4293.44 MB",
+        "size": "4.19 MB",
         "activation": "175.22 KB"
     },
     "NASNetMobile (Benchmark)": {
         "params": "4405270",
         "flops": "202363388",
-        "size": "5177.49 MB",
+        "size": "5.06 MB",
         "activation": "71.09 KB"
     }
 }

@@ -58,12 +58,15 @@ def organize_kaggle_results(download_dir):
     moved_samples = 0
     
     # 1. Move .h5 model files
-    print("\n📦 Moving model files (.h5)...")
+    print("\n📦 Moving model files (.h5) to backend/models/...")
     for h5_file in outputs_source.glob("*.h5"):
         target = models_target / h5_file.name
         shutil.copy2(h5_file, target)
-        print(f"   ✅ {h5_file.name} → models/")
+        print(f"   ✅ {h5_file.name} → models/ ({h5_file.stat().st_size / 1024 / 1024:.2f} MB)")
         moved_models += 1
+    
+    if moved_models == 0:
+        print("   ⚠️  No .h5 model files found in source directory")
     
     # 2. Move JSON files
     print("\n📄 Moving JSON files...")

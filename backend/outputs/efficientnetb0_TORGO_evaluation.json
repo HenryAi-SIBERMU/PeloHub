@@ -4,7 +4,7 @@
     "accuracy": 0.79,
     "flops": 148230643,
     "params": 4213797,
-    "inference_time_ms": 282.12777853012085,
+    "inference_time_ms": 272.7030396461487,
     "classification_report": {
         "control": {
             "precision": 0.7543859649122807,

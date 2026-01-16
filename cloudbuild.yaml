@@ -46,15 +46,9 @@ steps:
   # 3. FRONTEND: Build & Deploy
   # ==========================================
 
-  # Build Frontend Image (Injecting Backend URL)
+  # Build Frontend Image
   - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: '/bin/bash'
-    args:
-      - '-c'
-      - |
-        export BACKEND_URL=$$(cat /workspace/backend_url.txt)
-        echo "Building Frontend with VITE_API_URL=$$BACKEND_URL"
-        docker build --build-arg VITE_API_URL=$$BACKEND_URL -t gcr.io/$PROJECT_ID/pelohub ./frontend
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/pelohub', './frontend']
     id: 'Build Frontend'
 
   # Push Frontend Image
@@ -62,20 +56,20 @@ steps:
     args: ['push', 'gcr.io/$PROJECT_ID/pelohub']
     id: 'Push Frontend'
 
-  # Deploy Frontend to Cloud Run
+  # Deploy Frontend to Cloud Run (Injecting BACKEND_URL at Runtime)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
+    entrypoint: '/bin/bash'
     args:
-      - 'run'
-      - 'deploy'
-      - 'pelohub'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/pelohub'
-      - '--region'
-      - 'asia-southeast2'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
+      - '-c'
+      - |
+        BACKEND_URL=$$(cat /workspace/backend_url.txt)
+        echo "Deploying Frontend with BACKEND_URL=$$BACKEND_URL"
+        gcloud run deploy pelohub \
+          --image gcr.io/$PROJECT_ID/pelohub \
+          --region asia-southeast2 \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars BACKEND_URL=$$BACKEND_URL
     id: 'Deploy Frontend'
 
 images:

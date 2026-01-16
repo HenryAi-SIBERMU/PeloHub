@@ -1,0 +1,27 @@
+{
+    "control": {
+        "precision": 0.7634408602150538,
+        "recall": 0.71,
+        "f1-score": 0.7357512953367875,
+        "support": 100.0
+    },
+    "dysarthric": {
+        "precision": 0.7289719626168224,
+        "recall": 0.78,
+        "f1-score": 0.7536231884057971,
+        "support": 100.0
+    },
+    "accuracy": 0.745,
+    "macro avg": {
+        "precision": 0.7462064114159381,
+        "recall": 0.745,
+        "f1-score": 0.7446872418712923,
+        "support": 200.0
+    },
+    "weighted avg": {
+        "precision": 0.7462064114159381,
+        "recall": 0.745,
+        "f1-score": 0.7446872418712922,
+        "support": 200.0
+    }
+}

@@ -76,7 +76,13 @@ def create_transfer_learning_model(base_model_class, input_shape, num_classes=2,
     # MobileNetV3/EfficientNet expect 3 channels. 
     # Shapes will be inferred or resized by the model if strictly required, 
     # but (40, 174, 3) is generally accepted by these flexible architectures (except some specific ones).
-    base_model = base_model_class(include_top=False, weights='imagenet', input_tensor=x)
+    # Base Model
+    # MobileNetV3/EfficientNet expect 3 channels. 
+    # Shapes will be inferred or resized by the model if strictly required, 
+    # but (40, 174, 3) is generally accepted by these flexible architectures (except some specific ones).
+    # SET WEIGHTS=None because we load our own fine-tuned weights immediately. 
+    # This prevents downloading ImageNet weights on every container start.
+    base_model = base_model_class(include_top=False, weights=None, input_tensor=x)
     
     base_model.trainable = False # Freeze base
     
