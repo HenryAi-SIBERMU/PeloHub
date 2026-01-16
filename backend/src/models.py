@@ -13,36 +13,49 @@ models = keras.models
 
 def create_lightweight_cnn(input_shape, num_classes=2): 
     """
-    Standard Lightweight Architecture (~50k-150k Params).
-    Scaled up version with more filters for better capacity.
+    Proposed Lightweight Architecture (Optimized).
+    Features:
+    - BatchNormalization for stability (Smooth Loss Curve).
+    - L2 Regularization to prevent Overfitting/Leakage-memorization.
+    - HeUniform Init for better convergence.
     """
-    # Using Functional API for consistency
+    regularizer = keras.regularizers.l2(1e-4)
+    initializer = 'he_uniform'
+
+    # Using Functional API
     inputs = layers.Input(shape=input_shape)
     
     # Conv Block 1: Basic Features
-    x = layers.Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
+    x = layers.Conv2D(32, (3, 3), padding='same', kernel_regularizer=regularizer, kernel_initializer=initializer, use_bias=False)(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
     x = layers.MaxPooling2D((2, 2))(x)
     
-    # Conv Block 2: Intermediate Features (Scaled Up to 64)
-    x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    # Conv Block 2: Intermediate Features
+    x = layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=regularizer, kernel_initializer=initializer, use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
     x = layers.MaxPooling2D((2, 2))(x)
 
-    # Conv Block 3: Advanced Features (New Block, Scaled Up to 128)
-    x = layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+    # Conv Block 3: Advanced Features
+    x = layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=regularizer, kernel_initializer=initializer, use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
     x = layers.MaxPooling2D((2, 2))(x)
     
-    # Flatten & Dense
-    # Still using GAP for translation invariance
+    # Feature Vector
     x = layers.GlobalAveragePooling2D()(x)
     
-    # Larger Dense Layer for better decision boundary
-    x = layers.Dense(128, activation='relu')(x)
-    x = layers.Dropout(0.5)(x)
+    # Dense Layer (Classifier Head)
+    x = layers.Dense(128, kernel_regularizer=regularizer, kernel_initializer=initializer, use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation('relu')(x)
+    x = layers.Dropout(0.5)(x) # Conserved Dropout
     
     # Output
     outputs = layers.Dense(num_classes, activation='softmax')(x)
     
-    model = models.Model(inputs, outputs, name="Lightweight_CNN_STFT")
+    model = models.Model(inputs, outputs, name="Lightweight_CNN_STFT_Optimized")
     return model
 
 def create_transfer_learning_model(base_model_class, input_shape, num_classes=2, model_name='TL_Model'):

@@ -1,37 +1,31 @@
-# Exclude Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-
-# Virtual environments
-.venv/
-venv/
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
 env/
-
-# Git
-.git/
-.gitignore
-
-# Development files
-notebooks/
-tools/
-*.ipynb
-
-# Test files
-tests/
-pytest.ini
-.pytest_cache/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Logs
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
 *.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesisfs
 
-# OS
-.DS_Store
-Thumbs.db
+# Data & Models (Exclude heavy files from build context to speed up upload)
+# We might need the BEST model, but not all checkpoints.
+# For Cloud Run, we usually COPY the model into the container.
+# Make sure 'models/' is included if we need pre-trained models.
+# outputs/ can be ignored as it's for local visualization.
+
+outputs/
+# Uncomment below if you download large datasets locally
+# data/

@@ -57,24 +57,21 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Hero Banner */}
-            <div className="w-full h-64 md:h-80 rounded-2xl overflow-hidden relative shadow-md group">
+            <div className="w-full min-h-[18rem] md:min-h-[22rem] rounded-2xl overflow-hidden relative shadow-md group flex items-end">
                 <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuA7ekgr2BWribqt0CPOn44776TjIeE6FfyTWsx_ryvdyauIbMWX20zMQJQvfEc3Z_Qye031EAFc3bhpHE8AuRWA-8yOM91IO9_pWOfCjTculf5NgGHpBm9Ont4HyInORfcOm1mqUVoW1-qreCuFerUng1DSTG760gIW9__-BIycq7lD5wlVIG4sF0w3igtJFF_XyCzixvLGSe8APJXzHqYteJIbpRkUmBUjaa23a_KORqwsbg6QHdg0QcFoJAZwUtwAUQkTY5vKVxoO")' }}></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10"></div>
-                <div className="absolute bottom-0 left-0 p-6 md:p-10 max-w-2xl">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10"></div>
+                <div className="relative z-10 p-6 md:p-10 max-w-3xl w-full">
                     <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold uppercase tracking-wider mb-3">
-                        {t('dash.latest_exp')}
+                        Latest Version
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-black text-white leading-tight mb-2">Dysarthric Speech Recognition {data?.experiment_version || "v2.0"}</h2>
-                    <p className="text-gray-200 text-sm md:text-base leading-relaxed max-w-lg mb-6">
-                        Current Best Model: <strong>{topModel.name}</strong> with {topModel.accuracy}% Accuracy.
-                        {t('dash.exp_desc')}
+                    <h2 className="text-3xl md:text-4xl font-black text-white leading-tight mb-3">PeloHub - Dysarthric Speech Recognition <br /><span className="text-xl md:text-2xl font-medium opacity-90">(Thesis Project by : HenryAi -MTI UAD)</span></h2>
+                    <p className="text-gray-200 text-sm md:text-base leading-relaxed max-w-2xl mb-6">
+                        Implementation of a proposed lightweight CNN-STFT architecture benchmarked against MobileNetV3, EfficientNetB0, and NASNetMobile.
+                        Designed to provide superior inference speed on edge devices while maintaining competitive accuracy for Dysarthric Speech Classification.
                     </p>
-                    <div className="flex gap-3">
-                        <button onClick={() => navigate('/evaluation')} className="px-6 py-2.5 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg transition-colors">
+                    <div className="flex flex-wrap gap-3">
+                        <button onClick={() => navigate('/evaluation')} className="px-6 py-2.5 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/30">
                             {t('dash.view_analysis')}
-                        </button>
-                        <button onClick={() => navigate('/training')} className="px-6 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur text-white font-semibold rounded-lg transition-colors border border-white/20">
-                            {t('dash.check_logs')}
                         </button>
                     </div>
                 </div>
@@ -146,7 +143,7 @@ const Dashboard: React.FC = () => {
                 {/* Quick Actions / Navigation Grid */}
                 <div className="lg:col-span-2 flex flex-col gap-4">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t('dash.deep_dive')}</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                         <button onClick={() => navigate('/evaluation')} className="group flex p-4 rounded-xl bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 hover:border-primary/50 hover:shadow-md transition-all text-left">
                             <div className="size-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center mr-4 group-hover:bg-primary group-hover:text-white transition-colors">
                                 <span className="material-symbols-outlined text-2xl">compare_arrows</span>

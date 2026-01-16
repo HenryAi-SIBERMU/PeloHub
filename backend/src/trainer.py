@@ -103,7 +103,8 @@ def get_model_memory_usage(model):
     # Estimasi ukuran disk (Paper 2 logic)
     temp_model_path = "temp_model_for_size.h5" 
     try:
-        model.save(temp_model_path)
+        # EXCLUDE OPTIMIZER to get true inference/deployment size
+        model.save(temp_model_path, include_optimizer=False)
         model_size_on_disk = os.path.getsize(temp_model_path)
     except Exception as e:
         print(f"Error saving model for size estimation: {e}")
@@ -125,8 +126,12 @@ def train_model(model, train_ds, val_ds, model_name='custom_cnn'):
     Orchestrates the training process.
     """
     # Compile
-    # Use Optimzer from Config (default: Adam per Paper 2)
-    optimizer_config = config.OPTIMIZER if hasattr(config, 'OPTIMIZER') else 'adam'
+    # Compile
+    # Use Optimzer from Config (Explicitly use Learning Rate)
+    if hasattr(config, 'OPTIMIZER') and config.OPTIMIZER.lower() == 'adam':
+        optimizer_config = tf.keras.optimizers.Adam(learning_rate=config.LEARNING_RATE)
+    else:
+        optimizer_config = 'adam' # Fallback to default
     
     # Paper 2 uses 'sparse_categorical_crossentropy'
     model.compile(
@@ -179,12 +184,23 @@ def evaluate_model(model, test_ds, class_names, model_name='custom_cnn'):
     
     # 1. Predictions
     y_pred_probs = model.predict(test_ds)
-    y_pred = np.argmax(y_pred_probs, axis=1)
+    
+    # Handle both 1D and 2D prediction outputs
+    if len(y_pred_probs.shape) > 1 and y_pred_probs.shape[1] > 1:
+        y_pred = np.argmax(y_pred_probs, axis=1)
+    else:
+        # Already class indices or single output
+        y_pred = (y_pred_probs > 0.5).astype(int).flatten()
     
     # Extract true labels from dataset (iterate)
     y_true = []
     for _, labels in test_ds:
-        y_true.extend(np.argmax(labels.numpy(), axis=1))
+        labels_np = labels.numpy()
+        # Handle both one-hot and integer labels
+        if len(labels_np.shape) > 1 and labels_np.shape[1] > 1:
+            y_true.extend(np.argmax(labels_np, axis=1))
+        else:
+            y_true.extend(labels_np.flatten())
     y_true = np.array(y_true)
     
     # Ensure lengths match (drop leftovers if any, usually valid/test handled carefully)

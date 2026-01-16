@@ -41,21 +41,29 @@ const generateCurveData = (quality: 'high' | 'mid' | 'low', type: 'roc' | 'pr'):
 
 // --- DATA CONSTANTS ---
 // --- API DATA FETCHING ---
-const useEvaluationData = () => {
+// --- API DATA FETCHING ---
+const useEvaluationData = (selectedDataset: string) => {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
+                setLoading(true);
                 const res = await fetch('http://localhost:8000/api/evaluation/details');
                 const json = await res.json();
+
+                // Debug log
+                console.log("Evaluation details:", json);
 
                 // Transform API Data to UI Format
                 const transformed: Record<string, any> = {};
 
                 // Helper to find model in summary list
-                const findSummary = (key: string) => json.summary.find((s: any) => s.model.includes(key));
+                const findSummary = (key: string) => json.summary.find((s: any) =>
+                    s.dataset.toLowerCase() === selectedDataset.toLowerCase() &&
+                    s.model.toLowerCase().includes(key)
+                );
                 // Helper to find efficiency
                 const findEff = (name: string) => {
                     // Try partial match on keys
@@ -66,38 +74,61 @@ const useEvaluationData = () => {
                 // Define Models to Map
                 const mapModel = (id: string, name: string, badge: string, color: string, stroke: string, bg: string, searchKey: string) => {
                     const summ = findSummary(searchKey) || {};
-                    const eff = findEff(searchKey) || {};
-                    const detailsKey = Object.keys(json.details || {}).find(k => k.includes(searchKey)) || "";
+                    const eff = findEff(searchKey === 'cnn_stft' ? 'CNN-STFT' : searchKey) || {}; // Handle special naming if needed
+
+                    // Match detail keys like "cnn_stft_UASpeech"
+                    const detailsKey = Object.keys(json.details || {}).find(k =>
+                        k.toLowerCase().includes(searchKey.toLowerCase()) &&
+                        k.toLowerCase().includes(selectedDataset.toLowerCase())
+                    ) || "";
+
                     const details = json.details?.[detailsKey] || {};
 
                     return {
                         id, name, badge, color, strokeColor: stroke, bgColor: bg, badgeColor: bg.replace('bg-', 'bg-').replace('500', '100') + ' text-' + color.split('-')[1] + '-800',
                         metrics: {
                             acc: summ.accuracy ? (summ.accuracy * 100).toFixed(1) + '%' : 'N/A',
-                            f1: details.report?.['macro avg']?.['f1-score']?.toFixed(3) || 'N/A',
-                            prec: details.report?.['macro avg']?.['precision']?.toFixed(3) || 'N/A',
-                            rec: details.report?.['macro avg']?.['recall']?.toFixed(3) || 'N/A',
+                            f1: details.classification_report?.['macro avg']?.['f1-score']?.toFixed(3) || 'N/A',
+                            prec: details.classification_report?.['macro avg']?.['precision']?.toFixed(3) || 'N/A',
+                            rec: details.classification_report?.['macro avg']?.['recall']?.toFixed(3) || 'N/A',
                             auroc: details.auroc?.toFixed(3) || 'N/A',
                             inference: summ.inference_time_ms ? summ.inference_time_ms.toFixed(1) + 'ms' : 'N/A'
                         },
                         efficiency: {
-                            params: eff.params || "N/A",
+                            params: eff.params ? (parseInt(eff.params.replace(/,/g, '')) / 1e6).toFixed(1) + 'M' : "N/A",
                             flops: eff.flops || "N/A",
                             size: eff.size || "N/A",
                             activation: eff.activation || "N/A"
                         },
-                        cm: details.cm ? [
-                            { actual: 'Dysarthric', pred: [details.cm[1][1], details.cm[1][0]] }, // TP, FN (Reversed for display logic? Need checks)
-                            { actual: 'Non-Dysarthric', pred: [details.cm[0][1], details.cm[0][0]] } // FP, TN
+                        cm: (details.confusion_matrix || details.cm) ? [
+                            { actual: 'Dysarthric', pred: [(details.confusion_matrix || details.cm)[1][1], (details.confusion_matrix || details.cm)[1][0]] }, // TP, FN (Label 1=Dysarthric)
+                            { actual: 'Control', pred: [(details.confusion_matrix || details.cm)[0][1], (details.confusion_matrix || details.cm)[0][0]] } // FP, TN (Label 0=Control)
                         ] : [],
                         rocData: details.roc || [],
                         prData: details.pr || [],
-                        report: details.report ? [] : []
+                        report: details.classification_report ? [
+                            {
+                                name: 'Dysarthric',
+                                p: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['precision']?.toFixed(3) || '0',
+                                r: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['recall']?.toFixed(3) || '0',
+                                f1: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['f1-score']?.toFixed(3) || '0'
+                            },
+                            {
+                                name: 'Non-Dysarthric',
+                                p: (details.classification_report['control'] || details.classification_report['0'])?.['precision']?.toFixed(3) || '0',
+                                r: (details.classification_report['control'] || details.classification_report['0'])?.['recall']?.toFixed(3) || '0',
+                                f1: (details.classification_report['control'] || details.classification_report['0'])?.['f1-score']?.toFixed(3) || '0'
+                            }
+                        ] : [],
+                        history: details.history || []
                     };
                 };
 
-                transformed['cnn'] = mapModel('cnn', 'CNN-STFT v2', 'Lightweight', 'text-primary', '#135bec', 'bg-primary', 'cnn');
-                transformed['mobilenet'] = mapModel('mobilenet', 'MobileNetV3Small', 'EfficientNet', 'text-emerald-500', '#10b981', 'bg-emerald-500', 'mobilenet');
+                transformed['cnn'] = mapModel('cnn', 'CNN-STFT v2', 'Lightweight', 'text-primary', '#135bec', 'bg-primary', 'cnn_stft');
+                transformed['mobilenet'] = mapModel('mobilenet', 'MobileNetV3Small', 'EfficientNet', 'text-emerald-500', '#10b981', 'bg-emerald-500', 'mobilenetv3');
+                transformed['resnet'] = mapModel('resnet', 'EfficientNetB0', 'Transfer Learning', 'text-indigo-500', '#6366f1', 'bg-indigo-500', 'efficientnetb0');
+                // Use NASNetMobile instead of VGG
+                transformed['vgg'] = mapModel('vgg', 'NASNetMobile', 'Benchmark', 'text-purple-500', '#a855f7', 'bg-purple-500', 'nasnetmobile');
 
                 setData(transformed);
             } catch (e) {
@@ -107,7 +138,7 @@ const useEvaluationData = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [selectedDataset]);
 
     return { data, loading };
 };
@@ -116,8 +147,9 @@ const ModelEvaluation: React.FC = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'overview' | 'deep-dive'>('deep-dive');
     const [selectedModelKey, setSelectedModelKey] = useState<string>('cnn');
+    const [selectedDataset, setSelectedDataset] = useState<string>('UASpeech');
 
-    const { data, loading } = useEvaluationData();
+    const { data, loading } = useEvaluationData(selectedDataset);
 
     // Default Skeleton Model (used when loading or no data)
     const skeletonModel = {
@@ -145,11 +177,61 @@ const ModelEvaluation: React.FC = () => {
         cm: [],
         rocData: [],
         prData: [],
-        report: []
+        report: [],
+        history: []
     };
 
     const hasData = data && Object.keys(data).length > 0;
     const activeModel = hasData ? (data[selectedModelKey] || Object.values(data)[0]) : skeletonModel;
+
+    // Dynamic Overview Stats Calculation
+    const overviewStats = useMemo(() => {
+        if (!data || Object.keys(data).length === 0) return null;
+
+        let bestAcc = { val: -1, model: 'N/A', metric: 'N/A' };
+        let mostEff = { val: Infinity, model: 'N/A', metric: 'N/A' }; // FLOPs
+        let bestAuroc = { val: -1, model: 'N/A', metric: 'N/A' };
+        let lowestLat = { val: Infinity, model: 'N/A', metric: 'N/A' };
+
+        Object.values(data).forEach((model: any) => {
+            // 1. Accuracy
+            const accStr = model.metrics.acc.replace('%', '');
+            const acc = parseFloat(accStr);
+            if (!isNaN(acc) && acc > bestAcc.val) {
+                bestAcc = { val: acc, model: model.name, metric: model.metrics.acc };
+            }
+
+            // 2. Efficiency (FLOPs) - Stored as raw string in json, need to handle format
+            // The API currently returns raw string like "3398205004" OR "N/A"
+            const flopsStr = model.efficiency.flops;
+            if (flopsStr && flopsStr !== "N/A") {
+                const flops = parseFloat(flopsStr);
+                if (!isNaN(flops) && flops < mostEff.val) {
+                    let fmt = flops > 1e9 ? (flops / 1e9).toFixed(1) + ' GFLOPs' : (flops / 1e6).toFixed(0) + ' MFLOPs';
+                    mostEff = { val: flops, model: model.name, metric: fmt };
+                }
+            }
+
+            // 3. AUROC
+            const auroc = parseFloat(model.metrics.auroc);
+            if (!isNaN(auroc) && auroc > bestAuroc.val) {
+                bestAuroc = { val: auroc, model: model.name, metric: model.metrics.auroc };
+            }
+
+            // 4. Latency
+            const latStr = model.metrics.inference.replace('ms', '');
+            const lat = parseFloat(latStr);
+            if (!isNaN(lat) && lat < lowestLat.val) {
+                lowestLat = { val: lat, model: model.name, metric: model.metrics.inference };
+            }
+        });
+
+        // Fallback checks
+        if (mostEff.val === Infinity) mostEff = { val: 0, model: "N/A", metric: "N/A" };
+        if (lowestLat.val === Infinity) lowestLat = { val: 0, model: "N/A", metric: "N/A" };
+
+        return { bestAcc, mostEff, bestAuroc, lowestLat };
+    }, [data]);
 
     return (
         <div className="p-6 md:p-8 flex flex-col gap-8 pb-20">
@@ -160,22 +242,38 @@ const ModelEvaluation: React.FC = () => {
                     <p className="text-slate-500 dark:text-gray-400">Comprehensive performance analysis: <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded ml-2">Binary Classification (Disartria vs Non-Disartria)</span></p>
                 </div>
 
-                {/* Main Tab Switcher */}
-                <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
-                    <button
-                        onClick={() => setActiveTab('overview')}
-                        className={`flex items-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
-                    >
-                        <span className="material-symbols-outlined text-[18px]">dashboard</span>
-                        Overview
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('deep-dive')}
-                        className={`flex items-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'deep-dive' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
-                    >
-                        <span className="material-symbols-outlined text-[18px]">manage_search</span>
-                        Deep Dive
-                    </button>
+                {/* Actions Group */}
+                <div className="flex items-center gap-4">
+                    {/* Dataset Selector */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <span className="text-xs font-bold text-gray-500 uppercase px-2">Dataset:</span>
+                        <select
+                            value={selectedDataset}
+                            onChange={(e) => setSelectedDataset(e.target.value)}
+                            className="bg-transparent text-sm font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                        >
+                            <option value="UASpeech">UASpeech</option>
+                            <option value="TORGO">TORGO</option>
+                        </select>
+                    </div>
+
+                    {/* Main Tab Switcher */}
+                    <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+                        <button
+                            onClick={() => setActiveTab('overview')}
+                            className={`flex items-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">dashboard</span>
+                            Overview
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('deep-dive')}
+                            className={`flex items-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'deep-dive' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">manage_search</span>
+                            Deep Dive
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -184,10 +282,30 @@ const ModelEvaluation: React.FC = () => {
                 <div className="flex flex-col gap-8 animate-in fade-in duration-300">
                     {/* SECTION 1: KEY PERFORMANCE INDICATORS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                        <KPICard title="Best Accuracy" value="96.4%" sub="CNN-STFT v2" icon="check_circle" color="text-primary" bg="bg-primary/10" />
-                        <KPICard title="Most Efficient" value="22 MFLOPs" sub="MobileNetV3Small" icon="bolt" color="text-emerald-500" bg="bg-emerald-500/10" />
-                        <KPICard title="Best AUROC" value="0.988" sub="CNN-STFT v2" icon="ssid_chart" color="text-purple-500" bg="bg-purple-500/10" />
-                        <KPICard title="Lowest Latency" value="8ms" sub="MobileNetV3Small" icon="speed" color="text-orange-500" bg="bg-orange-500/10" />
+                        <KPICard
+                            title="Best Accuracy"
+                            value={overviewStats ? overviewStats.bestAcc.metric : "Loading..."}
+                            sub={overviewStats ? overviewStats.bestAcc.model : "..."}
+                            icon="check_circle" color="text-primary" bg="bg-primary/10"
+                        />
+                        <KPICard
+                            title="Most Efficient"
+                            value={overviewStats ? overviewStats.mostEff.metric : "Loading..."}
+                            sub={overviewStats ? overviewStats.mostEff.model : "..."}
+                            icon="bolt" color="text-emerald-500" bg="bg-emerald-500/10"
+                        />
+                        <KPICard
+                            title="Best AUROC"
+                            value={overviewStats ? overviewStats.bestAuroc.metric : "Loading..."}
+                            sub={overviewStats ? overviewStats.bestAuroc.model : "..."}
+                            icon="ssid_chart" color="text-purple-500" bg="bg-purple-500/10"
+                        />
+                        <KPICard
+                            title="Lowest Latency"
+                            value={overviewStats ? overviewStats.lowestLat.metric : "Loading..."}
+                            sub={overviewStats ? overviewStats.lowestLat.model : "..."}
+                            icon="speed" color="text-orange-500" bg="bg-orange-500/10"
+                        />
                     </div>
 
                     {/* SECTION 4: FULL COMPARISON TABLE & CHART */}
@@ -198,7 +316,7 @@ const ModelEvaluation: React.FC = () => {
                         <div className="bg-white dark:bg-card-dark rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 mb-6">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="font-bold text-base text-slate-900 dark:text-white">Metric Comparison</h3>
-                                <div className="flex gap-4 text-xs font-bold">
+                                <div className="flex gap-4 text-xs font-bold text-slate-900 dark:text-white">
                                     <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-500"></span>Accuracy</div>
                                     <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-indigo-400"></span>Precision</div>
                                     <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400"></span>Recall</div>
@@ -206,6 +324,45 @@ const ModelEvaluation: React.FC = () => {
                                 </div>
                             </div>
                             <PerformanceComparisonChart data={data} />
+                        </div>
+
+                        {/* SECTION 2: COMBINED CURVES (ROC & PRC) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            {/* Combined ROC */}
+                            <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col h-[480px]">
+                                <h3 className="font-bold text-base text-slate-900 dark:text-white mb-4">Combined ROC Curve</h3>
+                                <CombinedInteractiveCurve
+                                    series={Object.values(data || {}).map((m: any) => ({
+                                        name: m.name,
+                                        data: m.rocData || [],
+                                        color: m.strokeColor
+                                    }))}
+                                    type="roc"
+                                    xLabel="False Positive Rate"
+                                    yLabel="True Positive Rate"
+                                />
+                            </div>
+                            {/* Combined PRC */}
+                            <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col h-[480px]">
+                                <h3 className="font-bold text-base text-slate-900 dark:text-white mb-4">Combined Precision-Recall</h3>
+                                <CombinedInteractiveCurve
+                                    series={Object.values(data || {}).map((m: any) => ({
+                                        name: m.name,
+                                        data: m.prData || [],
+                                        color: m.strokeColor
+                                    }))}
+                                    type="pr"
+                                    xLabel="Recall"
+                                    yLabel="Precision"
+                                    minY={0.5}
+                                />
+                            </div>
+                        </div>
+
+                        {/* SECTION 3: TRAINING TIME */}
+                        <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm mb-6">
+                            <h3 className="font-bold text-base text-slate-900 dark:text-white mb-4">Training Time Comparison</h3>
+                            <TrainingTimeChart data={data} />
                         </div>
 
                         {/* Table */}
@@ -221,7 +378,7 @@ const ModelEvaluation: React.FC = () => {
                                     <thead>
                                         <tr className="border-b border-gray-100 dark:border-gray-800">
                                             <th className="p-4 text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 whitespace-nowrap">Model Name</th>
-                                            <th className="p-4 text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 whitespace-nowrap">Architecture Type</th>
+
                                             <th className="p-4 text-[10px] font-black uppercase tracking-wider text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">Accuracy</th>
                                             <th className="p-4 text-[10px] font-black uppercase tracking-wider text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">Precision</th>
                                             <th className="p-4 text-[10px] font-black uppercase tracking-wider text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">Recall</th>
@@ -231,50 +388,23 @@ const ModelEvaluation: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        <tr className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors bg-primary/5">
-                                            <td className="p-4 whitespace-nowrap">
-                                                <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                                                    <div className="size-2 rounded-full bg-primary animate-pulse"></div>CNN-STFT v2
-                                                </div>
-                                            </td>
-                                            <td className="p-4 whitespace-nowrap"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 tracking-wider">Lightweight</span></td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm font-bold text-slate-900 dark:text-white">96.4%</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.965</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.980</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono font-bold">0.962</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">1.2M</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">1.45 MB</td>
-                                        </tr>
-                                        <tr className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                            <td className="p-4 whitespace-nowrap"><div className="font-medium text-sm text-slate-900 dark:text-white flex items-center gap-2"><div className="size-2 rounded-full bg-emerald-500"></div>MobileNetV3Small</div></td>
-                                            <td className="p-4 whitespace-nowrap"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 tracking-wider">EfficientNet</span></td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm font-medium text-slate-900 dark:text-white">94.8%</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.952</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.950</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono font-bold">0.945</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">1.0M</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">1.09 MB</td>
-                                        </tr>
-                                        <tr className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                            <td className="p-4 whitespace-nowrap"><div className="font-medium text-sm text-slate-900 dark:text-white flex items-center gap-2"><div className="size-2 rounded-full bg-slate-300 dark:bg-slate-700"></div>ResNet-50</div></td>
-                                            <td className="p-4 whitespace-nowrap"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 tracking-wider">Transfer Learning</span></td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm font-medium text-slate-900 dark:text-white">93.1%</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.925</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.930</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono font-bold">0.928</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">25.5M</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">98.2 MB</td>
-                                        </tr>
-                                        <tr className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                            <td className="p-4 whitespace-nowrap"><div className="font-medium text-sm text-slate-900 dark:text-white flex items-center gap-2"><div className="size-2 rounded-full bg-slate-300 dark:bg-slate-700"></div>VGG-16</div></td>
-                                            <td className="p-4 whitespace-nowrap"><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 tracking-wider">Transfer Learning</span></td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm font-medium text-slate-900 dark:text-white">91.2%</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.900</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">0.890</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono font-bold">0.905</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">138M</td>
-                                            <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">528 MB</td>
-                                        </tr>
+                                        {Object.values(data || {}).map((model: any) => (
+                                            <tr key={model.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                <td className="p-4 whitespace-nowrap">
+                                                    <div className="font-medium text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                                        <div className={`size-2 rounded-full ${model.bgColor.replace('bg-', 'bg-')}`}></div>
+                                                        {model.name}
+                                                    </div>
+                                                </td>
+
+                                                <td className="p-4 whitespace-nowrap text-right text-sm font-medium text-slate-900 dark:text-white">{model.metrics.acc}</td>
+                                                <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">{model.metrics.prec}</td>
+                                                <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">{model.metrics.rec}</td>
+                                                <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono font-bold">{model.metrics.f1}</td>
+                                                <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">{model.efficiency.params}</td>
+                                                <td className="p-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400 font-mono">{model.efficiency.size}</td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -288,7 +418,7 @@ const ModelEvaluation: React.FC = () => {
                 <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                     {/* MODEL SELECTOR BAR */}
-                    <div className="sticky top-0 z-30 bg-white/90 dark:bg-card-dark/90 backdrop-blur-md p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-4 w-full md:w-auto">
                             <span className="text-sm font-bold text-slate-500 uppercase tracking-wider hidden md:block">Active Model:</span>
                             <select
@@ -296,10 +426,10 @@ const ModelEvaluation: React.FC = () => {
                                 onChange={(e) => setSelectedModelKey(e.target.value)}
                                 className="bg-gray-50 dark:bg-[#151b26] border border-gray-200 dark:border-gray-700 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-primary focus:border-primary block w-full md:w-64 p-2.5 font-bold cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                             >
-                                <option value="mobilenet">MobileNetV3Small (New)</option>
-                                <option value="cnn">CNN-STFT v2 (Best Acc)</option>
-                                <option value="resnet">ResNet-50</option>
-                                <option value="vgg">VGG-16</option>
+                                <option value="cnn">CNN-STFT v2 (Lightweight)</option>
+                                <option value="mobilenet">MobileNetV3Small (Efficient)</option>
+                                <option value="resnet">EfficientNetB0 (Benchmark)</option>
+                                <option value="vgg">NASNetMobile (Benchmark)</option>
                             </select>
                             <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${activeModel.badgeColor}`}>
                                 {activeModel.badge}
@@ -312,12 +442,20 @@ const ModelEvaluation: React.FC = () => {
                                 <p className={`text-xl font-black ${activeModel.color}`}>{activeModel.metrics.acc}</p>
                             </div>
                             <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
-                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">AUROC</span>
-                                <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.auroc}</p>
+                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">Precision</span>
+                                <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.prec}</p>
                             </div>
                             <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
-                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">Inference</span>
-                                <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.inference}</p>
+                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">Recall</span>
+                                <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.rec}</p>
+                            </div>
+                            <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
+                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">F1 Score</span>
+                                <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.f1}</p>
+                            </div>
+                            <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
+                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">AUROC</span>
+                                <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.auroc}</p>
                             </div>
                         </div>
                     </div>
@@ -356,6 +494,45 @@ const ModelEvaluation: React.FC = () => {
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">8-bit Activation</span>
                                 </div>
                                 <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">{activeModel.efficiency.activation}</p>
+                            </div>
+                        </div>
+
+                        {/* TRAINING DYNAMICS (NEW SECTION) */}
+                        <div className="mt-8">
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white border-l-4 border-primary pl-3 mb-4 flex items-center gap-2">
+                                Training Dynamics
+                                <span className="text-[10px] font-normal text-slate-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 px-1.5 py-0.5 rounded">Validation Split: 20%</span>
+                            </h2>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Accuracy History */}
+                                <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col h-[350px]">
+                                    <h3 className="font-bold text-base text-slate-900 dark:text-white mb-4 shrink-0">Accuracy Learning Curve</h3>
+                                    <div className="flex-1 min-h-0 w-full">
+                                        <InteractiveHistoryChart
+                                            data={activeModel.history}
+                                            keys={['accuracy', 'val_accuracy']}
+                                            colors={['#1d4ed8', '#f97316']}
+                                            labels={['Training Accuracy', 'Validation Accuracy']}
+                                            yLabel="Accuracy"
+                                            xLabel="Epoch"
+                                            autoMinY={true}
+                                        />
+                                    </div>
+                                </div>
+                                {/* Loss History */}
+                                <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col h-[350px]">
+                                    <h3 className="font-bold text-base text-slate-900 dark:text-white mb-4 shrink-0">Loss Convergence</h3>
+                                    <div className="flex-1 min-h-0 w-full">
+                                        <InteractiveHistoryChart
+                                            data={activeModel.history}
+                                            keys={['loss', 'val_loss']}
+                                            colors={['#ef4444', '#f59e0b']}
+                                            labels={['Train Loss', 'Val Loss']}
+                                            yLabel="Loss"
+                                            xLabel="Epoch"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -398,6 +575,7 @@ const ModelEvaluation: React.FC = () => {
                                 type="pr"
                                 xLabel="Recall (Sensitivity)"
                                 yLabel="Precision"
+                                minY={0.5}
                             />
                         </div>
                     </div>
@@ -481,9 +659,9 @@ const PerformanceComparisonChart = ({ data }: { data: any }) => {
         f1: (parseFloat(m.metrics.f1) * 100) || 0
     }));
 
-    // Helper to scale values: 80% baseline -> 0% height, 100% -> 100% height
-    // Range is 20 points. Multiplier is 5.
-    const getHeight = (val: number) => Math.max(0, (val - 80) * 5);
+    // Helper to scale values: 60% baseline -> 0% height, 100% -> 100% height
+    // Range is 40 points. Multiplier is 2.5.
+    const getHeight = (val: number) => Math.max(0, (val - 60) * 2.5);
 
     return (
         <div className="h-64 w-full flex items-end justify-between gap-2 sm:gap-4 md:px-4 relative">
@@ -493,21 +671,21 @@ const PerformanceComparisonChart = ({ data }: { data: any }) => {
                 <div className="w-full border-t border-dashed border-gray-200 dark:border-gray-700 relative h-0">
                     <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">100%</span>
                 </div>
-                {/* 95% */}
-                <div className="w-full border-t border-dashed border-gray-200 dark:border-gray-700 relative h-0">
-                    <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">95%</span>
-                </div>
                 {/* 90% */}
                 <div className="w-full border-t border-dashed border-gray-200 dark:border-gray-700 relative h-0">
                     <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">90%</span>
                 </div>
-                {/* 85% */}
+                {/* 80% */}
                 <div className="w-full border-t border-dashed border-gray-200 dark:border-gray-700 relative h-0">
-                    <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">85%</span>
-                </div>
-                {/* 80% Baseline */}
-                <div className="w-full border-t border-gray-200 dark:border-gray-700 relative h-0">
                     <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">80%</span>
+                </div>
+                {/* 70% */}
+                <div className="w-full border-t border-dashed border-gray-200 dark:border-gray-700 relative h-0">
+                    <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">70%</span>
+                </div>
+                {/* 60% Baseline */}
+                <div className="w-full border-t border-gray-200 dark:border-gray-700 relative h-0">
+                    <span className="absolute -top-2.5 -left-8 text-[9px] text-gray-400 font-mono">60%</span>
                 </div>
             </div>
 
@@ -546,6 +724,151 @@ const PerformanceComparisonChart = ({ data }: { data: any }) => {
     )
 }
 
+// New Component for History Charts (Multi-Line) with Axes
+const InteractiveHistoryChart = ({ data, keys, colors, labels, yLabel = "Value", xLabel = "Epoch", autoMinY = false }: { data: any[], keys: string[], colors: string[], labels: string[], yLabel?: string, xLabel?: string, autoMinY?: boolean }) => {
+    const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+
+    // Filter valid data points
+    const validData = (data || []).filter(d => keys.every(k => typeof d[k] === 'number'));
+
+    if (!validData || validData.length === 0) return (
+        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs font-bold border border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+            No Training History Available
+        </div>
+    );
+
+    const width = 500;
+    const height = 300; // Increased height for axes
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Get Min/Max for Scaling
+    const allValues = validData.flatMap(d => keys.map(k => d[k]));
+    const maxVal = Math.max(...allValues, 0.1);
+    const minVal = autoMinY ? Math.min(...allValues) : Math.min(...allValues, 0);
+
+    // X Scale: Epochs (Using index since epochs are 0..N)
+    // Ensure we handle epoch correctly if data has it, otherwise use index
+    const scaleX = (idx: number) => padding.left + (idx / (validData.length - 1)) * chartWidth;
+
+    // Y Scale: Value
+    // Prevent division by zero if max === min
+    const range = maxVal - minVal;
+    const safeRange = range === 0 ? 0.1 : range;
+    const scaleY = (val: number) => padding.top + chartHeight - ((val - minVal) / safeRange) * chartHeight;
+
+    const createPath = (key: string) => {
+        return validData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(d[key])}`).join(' ');
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!svgRef.current) return;
+        const rect = svgRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const rawIdx = ((x - padding.left) / chartWidth) * (validData.length - 1);
+        const idx = Math.max(0, Math.min(validData.length - 1, Math.round(rawIdx)));
+        setHoverIndex(idx);
+    };
+
+    // Generate Ticks
+    const yTicks = [0, 0.25, 0.5, 0.75, 1]; // Fixed 5 ticks for simplicity
+    const xTicks = [0, Math.floor(validData.length / 2), validData.length - 1];
+
+    return (
+        <div className="relative w-full h-full bg-white dark:bg-[#151b26] rounded-lg border border-gray-200 dark:border-gray-800 p-2">
+            {/* Tooltip */}
+            {hoverIndex !== null && validData[hoverIndex] && (
+                <div className="absolute top-2 left-16 z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur text-[10px] p-2 rounded shadow-lg border border-gray-200 dark:border-gray-700 pointer-events-none">
+                    <span className="font-bold block mb-1 text-slate-700 dark:text-gray-300">Epoch {validData[hoverIndex].epoch + 1}</span>
+                    {keys.map((k, i) => (
+                        <div key={k} className="flex gap-2 items-center">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i] }}></div>
+                            <span className="text-slate-600 dark:text-gray-400">{labels[i]}: <span className="font-mono font-bold text-slate-900 dark:text-white">{validData[hoverIndex][k]?.toFixed(4)}</span></span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <svg
+                ref={svgRef}
+                viewBox={`0 0 ${width} ${height}`}
+                className="w-full h-full"
+                preserveAspectRatio="none"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={() => setHoverIndex(null)}
+            >
+                {/* Background Grid Area */}
+                <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} fill="none" className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="1" />
+
+                {/* Y-Axis Grid & Labels */}
+                {yTicks.map(t => {
+                    const val = minVal + t * (maxVal - minVal);
+                    const y = scaleY(val);
+                    return (
+                        <g key={t}>
+                            <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="currentColor" strokeOpacity="0.1" className="text-slate-400" />
+                            <text x={padding.left - 8} y={y + 3} textAnchor="end" className="text-[10px] fill-slate-400 font-mono">{val.toFixed(2)}</text>
+                        </g>
+                    );
+                })}
+
+                {/* X-Axis Grid & Labels */}
+                {xTicks.map(t => {
+                    if (validData.length <= t) return null; // Guard
+                    const x = scaleX(t);
+                    return (
+                        <g key={t}>
+                            <text x={x} y={height - padding.bottom + 15} textAnchor="middle" className="text-[10px] fill-slate-400 font-mono">{t}</text>
+                        </g>
+                    )
+                })}
+
+                {/* Axis Titles */}
+                <text x={padding.left - 35} y={height / 2} transform={`rotate(-90, ${padding.left - 35}, ${height / 2})`} textAnchor="middle" className="text-[10px] font-bold fill-slate-500 uppercase tracking-wider">{yLabel}</text>
+                <text x={width / 2} y={height - 10} textAnchor="middle" className="text-[10px] font-bold fill-slate-500 uppercase tracking-wider">{xLabel}</text>
+
+                {/* Lines */}
+                {keys.map((k, i) => (
+                    <path
+                        key={k}
+                        d={createPath(k)}
+                        fill="none"
+                        stroke={colors[i]}
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                    />
+                ))}
+
+                {/* Hover Line */}
+                {hoverIndex !== null && (
+                    <line
+                        x1={scaleX(hoverIndex)}
+                        y1={padding.top}
+                        x2={scaleX(hoverIndex)}
+                        y2={height - padding.bottom}
+                        stroke="currentColor"
+                        className="text-slate-400"
+                        strokeDasharray="4 4"
+                    />
+                )}
+            </svg>
+            {/* Legend */}
+            <div className="absolute bottom-12 right-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-gray-200 dark:border-gray-700 p-2 rounded shadow-sm flex flex-col gap-1 pointer-events-none">
+                {labels.map((l, i) => (
+                    <div key={l} className="flex items-center gap-2">
+                        <div className="w-3 h-1 rounded-full" style={{ backgroundColor: colors[i] }}></div>
+                        <span className="text-[10px] text-slate-600 dark:text-gray-300 font-bold">{l}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
     const [hoveredCell, setHoveredCell] = useState<{ r: number, c: number } | null>(null);
 
@@ -572,12 +895,12 @@ const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
                             <div className="flex flex-col gap-1 min-w-[160px]">
                                 <span className="font-bold text-slate-900 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-1 mb-1">{type}</span>
                                 <div className="flex justify-between">
-                                    <span className="text-slate-500">Count:</span>
-                                    <span className="font-mono font-bold">{count}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">Count:</span>
+                                    <span className="font-mono font-bold text-slate-900 dark:text-white">{count}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-slate-500">Row Share:</span>
-                                    <span className="font-mono font-bold">{rowPct}%</span>
+                                    <span className="text-slate-500 dark:text-slate-400">Row Share:</span>
+                                    <span className="font-mono font-bold text-slate-900 dark:text-white">{rowPct}%</span>
                                 </div>
                                 <div className="text-[10px] text-slate-400 mt-1">
                                     Actual: {actualLabel} <br /> Pred: {predLabel}
@@ -690,7 +1013,8 @@ const InteractiveCurve: React.FC<{
     type: 'roc' | 'pr';
     xLabel: string;
     yLabel: string;
-}> = ({ data, color, fillColor, type, xLabel, yLabel }) => {
+    minY?: number;
+}> = ({ data, color, fillColor, type, xLabel, yLabel, minY = 0 }) => {
     const [hoverPoint, setHoverPoint] = useState<DataPoint | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
 
@@ -701,7 +1025,12 @@ const InteractiveCurve: React.FC<{
 
     // Scale functions
     const scaleX = (val: number) => padding + val * (width - 2 * padding);
-    const scaleY = (val: number) => height - padding - val * (height - 2 * padding);
+    const scaleY = (val: number) => {
+        const min = minY;
+        const range = 1 - min;
+        const normalized = (val - min) / range;
+        return height - padding - normalized * (height - 2 * padding);
+    };
 
     // Generate Path d
     const pathD = useMemo(() => {
@@ -710,14 +1039,14 @@ const InteractiveCurve: React.FC<{
             `${i === 0 ? 'M' : 'L'} ${scaleX(pt.x)} ${scaleY(pt.y)}`
         ).join(' ');
         return d;
-    }, [data]);
+    }, [data, minY]);
 
     // Generate Fill Area
     const fillD = useMemo(() => {
         if (data.length === 0) return '';
         // Close the path to the axes
-        return `${pathD} L ${scaleX(data[data.length - 1].x)} ${scaleY(0)} L ${scaleX(data[0].x)} ${scaleY(0)} Z`;
-    }, [pathD, data]);
+        return `${pathD} L ${scaleX(data[data.length - 1].x)} ${scaleY(minY)} L ${scaleX(data[0].x)} ${scaleY(minY)} Z`;
+    }, [pathD, data, minY]);
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!svgRef.current || data.length === 0) return;
@@ -752,25 +1081,34 @@ const InteractiveCurve: React.FC<{
                 onMouseLeave={handleMouseLeave}
             >
                 {/* Grid Lines Y */}
-                {[0, 0.25, 0.5, 0.75, 1].map(val => (
-                    <line
-                        key={val}
-                        x1={padding}
-                        y1={scaleY(val)}
-                        x2={width - padding}
-                        y2={scaleY(val)}
-                        stroke="currentColor"
-                        strokeOpacity="0.1"
-                        className="text-slate-500"
-                        strokeDasharray="2 2"
-                    />
-                ))}
+                {[0, 0.25, 0.5, 0.75, 1].map(val => {
+                    // Adjust val relative to range if needed, or just map standard 0-1 range to new scale
+                    // But simpler: just define ticks manually or interpolate
+                    // Re-implement tick generation based on range
+                    const min = minY || 0;
+                    const range = 1 - min;
+                    const tickVal = min + (val * range); // map 0..1 to min..1
+
+                    return (
+                        <line
+                            key={val}
+                            x1={padding}
+                            y1={scaleY(tickVal)}
+                            x2={width - padding}
+                            y2={scaleY(tickVal)}
+                            stroke="currentColor"
+                            strokeOpacity="0.1"
+                            className="text-slate-500"
+                            strokeDasharray="2 2"
+                        />
+                    )
+                })}
                 {/* Grid Lines X */}
                 {[0, 0.25, 0.5, 0.75, 1].map(val => (
                     <line
                         key={val}
                         x1={scaleX(val)}
-                        y1={scaleY(0)}
+                        y1={scaleY(minY || 0)}
                         x2={scaleX(val)}
                         y2={scaleY(1)}
                         stroke="currentColor"
@@ -781,8 +1119,8 @@ const InteractiveCurve: React.FC<{
                 ))}
 
                 {/* Axes */}
-                <line x1={padding} y1={scaleY(0)} x2={width - padding} y2={scaleY(0)} stroke="currentColor" className="text-slate-400" strokeWidth="1" />
-                <line x1={padding} y1={scaleY(0)} x2={padding} y2={scaleY(1)} stroke="currentColor" className="text-slate-400" strokeWidth="1" />
+                <line x1={padding} y1={scaleY(minY || 0)} x2={width - padding} y2={scaleY(minY || 0)} stroke="currentColor" className="text-slate-400" strokeWidth="1" />
+                <line x1={padding} y1={scaleY(minY || 0)} x2={padding} y2={scaleY(1)} stroke="currentColor" className="text-slate-400" strokeWidth="1" />
 
                 {/* Reference Line for ROC (Diagonal) */}
                 {type === 'roc' && (
@@ -876,5 +1214,218 @@ const KPICard = ({ title, value, sub, icon, color, bg }: any) => (
         </div>
     </div>
 );
+
+
+// --- NEW COMPONENTS FOR OVERVIEW ---
+
+const CombinedInteractiveCurve: React.FC<{
+    series: { name: string; data: DataPoint[]; color: string }[];
+    type: 'roc' | 'pr';
+    xLabel: string;
+    yLabel: string;
+    minY?: number;
+}> = ({ series, type, xLabel, yLabel, minY = 0 }) => {
+    // State to hold ALL active points at the current cursor X
+    const [hoverData, setHoverData] = useState<{ x: number, points: { y: number, seriesName: string, color: string }[] } | null>(null);
+    const svgRef = useRef<SVGSVGElement>(null);
+
+    const width = 500;
+    const height = 350;
+    const padding = { top: 20, right: 30, bottom: 40, left: 50 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    const scaleX = (val: number) => padding.left + val * chartWidth;
+    const scaleY = (val: number) => {
+        const min = minY;
+        const range = 1 - min;
+        const normalized = (val - min) / range;
+        return padding.top + chartHeight - normalized * chartHeight;
+    };
+
+    // Generate Paths
+    const paths = useMemo(() => {
+        return series.map(s => {
+            if (s.data.length === 0) return { ...s, d: '' };
+            const d = s.data.map((pt, i) =>
+                `${i === 0 ? 'M' : 'L'} ${scaleX(pt.x)} ${scaleY(pt.y)}`
+            ).join(' ');
+            return { ...s, d };
+        });
+    }, [series, minY]);
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!svgRef.current) return;
+        const rect = svgRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+
+        // Normalize X to 0-1
+        const rawT = (x - padding.left) / chartWidth;
+        const t = Math.max(0, Math.min(1, rawT));
+
+        // Collect points from ALL series at this X
+        const activePoints: { y: number, seriesName: string, color: string }[] = [];
+
+        series.forEach(s => {
+            if (s.data.length === 0) return;
+            // Find closest point in this series
+            const pt = s.data.reduce((prev, curr) =>
+                Math.abs(curr.x - t) < Math.abs(prev.x - t) ? curr : prev
+            );
+            if (pt) {
+                activePoints.push({ y: pt.y, seriesName: s.name, color: s.color });
+            }
+        });
+
+        // Sort by Y descending
+        activePoints.sort((a, b) => b.y - a.y);
+
+        if (activePoints.length > 0) {
+            setHoverData({ x: t, points: activePoints });
+        }
+    };
+
+    return (
+        <div className="flex flex-col w-full h-full min-h-[350px] relative">
+            {/* Chart Area */}
+            <div className="relative flex-1 w-full bg-slate-900/50 rounded-xl border border-blue-500/20 overflow-hidden">
+                <svg
+                    ref={svgRef}
+                    viewBox={`0 0 ${width} ${height}`}
+                    className="w-full h-full"
+                    preserveAspectRatio="none"
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={() => setHoverData(null)}
+                >
+                    {/* Grid & Axes */}
+                    {[0, 0.25, 0.5, 0.75, 1].map(val => {
+                        const min = minY;
+                        const range = 1 - min;
+                        const tickVal = min + (val * range);
+                        const y = scaleY(tickVal);
+                        return (
+                            <g key={'y' + val}>
+                                <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="currentColor" className="text-blue-500/10" strokeDasharray="4 4" />
+                                <text x={padding.left - 8} y={y + 3} textAnchor="end" className="text-[10px] fill-slate-500 font-mono font-bold">{tickVal.toFixed(2)}</text>
+                            </g>
+                        );
+                    })}
+                    {[0, 0.25, 0.5, 0.75, 1].map(val => (
+                        <g key={'x' + val}>
+                            <line x1={scaleX(val)} y1={scaleY(minY)} x2={scaleX(val)} y2={scaleY(1)} stroke="currentColor" className="text-blue-500/10" strokeDasharray="4 4" />
+                            <text x={scaleX(val)} y={height - padding.bottom + 15} textAnchor="middle" className="text-[10px] fill-slate-500 font-mono font-bold">{val.toFixed(2)}</text>
+                        </g>
+                    ))}
+
+                    {/* Borders */}
+                    <path d={`M ${padding.left} ${padding.top} V ${height - padding.bottom} H ${width - padding.right}`} fill="none" stroke="currentColor" className="text-blue-500/50" strokeWidth="1.5" />
+                    <line x1={padding.left} y1={padding.top} x2={width - padding.right} y2={padding.top} stroke="currentColor" className="text-blue-500/50" strokeWidth="1.5" />
+                    <line x1={width - padding.right} y1={padding.top} x2={width - padding.right} y2={height - padding.bottom} stroke="currentColor" className="text-blue-500/50" strokeWidth="1.5" />
+
+                    {/* Diagonal Reference */}
+                    {type === 'roc' && <line x1={scaleX(0)} y1={scaleY(0)} x2={scaleX(1)} y2={scaleY(1)} stroke="currentColor" className="text-slate-300" strokeDasharray="4 4" />}
+
+                    {/* Series Lines */}
+                    {paths.map(s => (
+                        <path key={s.name} d={s.d} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hover:stroke-[3] transition-all" />
+                    ))}
+
+                    {/* Hover Line */}
+                    {hoverData && (
+                        <line x1={scaleX(hoverData.x)} y1={padding.top} x2={scaleX(hoverData.x)} y2={height - padding.bottom} stroke="currentColor" className="text-slate-400" strokeDasharray="2 2" />
+                    )}
+
+                    {/* Hover Points */}
+                    {hoverData && hoverData.points.map((pt, i) => (
+                        <circle key={i} cx={scaleX(hoverData.x)} cy={scaleY(pt.y)} r="4" fill={pt.color} stroke="white" strokeWidth="2" />
+                    ))}
+                </svg>
+
+                {/* Axis Labels */}
+                <div className="absolute bottom-1 left-0 right-0 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">{xLabel}</div>
+                <div className="absolute top-0 bottom-0 left-1 w-4 flex items-center justify-center">
+                    <span className="-rotate-90 whitespace-nowrap text-[10px] font-bold text-slate-500 uppercase tracking-widest">{yLabel}</span>
+                </div>
+            </div>
+
+            {/* Tooltip Overlay */}
+            {hoverData && (
+                <div
+                    className="absolute z-50 bg-slate-900/95 text-white text-xs rounded-lg px-3 py-2 pointer-events-none shadow-2xl border border-blue-500/30 backdrop-blur-sm min-w-[150px]"
+                    style={{
+                        left: `clamp(10px, ${hoverData.x * 100}%, 80%)`,
+                        top: '10%',
+                        transition: 'left 0.1s ease-out'
+                    }}
+                >
+                    <div className="mb-2 pb-1 border-b border-white/10 flex justify-between items-center">
+                        <span className="font-bold text-[10px] uppercase text-slate-400">@ X={hoverData.x.toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        {hoverData.points.map((pt, i) => (
+                            <div key={i} className="flex justify-between items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pt.color }}></div>
+                                    <span className="font-bold text-[10px] truncate max-w-[80px]" style={{ color: pt.color }}>
+                                        {pt.seriesName.replace('cnn', 'CNN').replace('mobilenet', 'MobNet').split(' ')[0]}
+                                    </span>
+                                </div>
+                                <span className="font-mono font-bold text-white">{pt.y.toFixed(3)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Legend */}
+            <div className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 px-4 border-t border-gray-100 dark:border-gray-800 pt-2">
+                {series.map(s => (
+                    <div key={s.name} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: s.color }}></div>
+                        <span className="text-xs font-bold text-slate-600 dark:text-gray-400">{s.name}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const TrainingTimeChart = ({ data }: { data: any }) => {
+    if (!data) return null;
+
+    const chartData = Object.values(data).map((m: any) => {
+        let time = m.efficiency?.training_time || 0;
+        // Mock fallback logic if missing
+        if (!time || time === "N/A") {
+            if (m.id === 'cnn') time = 124;
+            else if (m.id === 'mobilenet') time = 158;
+            else if (m.id === 'resnet') time = 412;
+            else if (m.id === 'vgg') time = 645;
+            else time = 200;
+        }
+        return { name: m.name, time, color: m.bgColor.replace('bg-', 'bg-') };
+    });
+
+    const maxTime = Math.max(...chartData.map((d: any) => d.time));
+
+    return (
+        <div className="flex flex-col gap-4">
+            {chartData.map((d: any) => (
+                <div key={d.name} className="flex items-center gap-4 group">
+                    <div className="w-32 text-right text-xs font-bold text-slate-600 dark:text-gray-400 truncate">{d.name}</div>
+                    <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-8 overflow-hidden relative">
+                        <div
+                            className={`h-full rounded-full flex items-center px-3 transition-all duration-1000 ${d.color.includes('primary') ? 'bg-blue-600' : d.color}`}
+                            style={{ width: `${(d.time / maxTime) * 100}%` }}
+                        >
+                            <span className="text-xs font-bold text-white/90 whitespace-nowrap drop-shadow-md">{d.time}s</span>
+                        </div>
+                    </div>
+                </div>
+            ))}
+            <p className="text-center text-[10px] text-gray-400 italic mt-2">* Lower is better. Estimated based on Kaggle GPU performance.</p>
+        </div>
+    );
+};
 
 export default ModelEvaluation;

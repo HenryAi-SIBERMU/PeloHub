@@ -37,7 +37,9 @@ const Sidebar: React.FC = () => {
           <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
             <span className="material-symbols-outlined text-xl">graphic_eq</span>
           </div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Dysarthria AI</h1>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
+            PeloHub
+          </h1>
         </div>
       </div>
 

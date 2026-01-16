@@ -14,6 +14,14 @@ type AudioFile = {
     waveform?: number[]; // Real data
     spectrogram?: number[][]; // Real data
     url?: string; // Real URL
+    filename?: string;
+};
+
+type AudioPair = {
+    id: string; // unique ID for the pair
+    word: string;
+    control: AudioFile;
+    dysarthric: AudioFile;
 };
 
 type SummaryTableRow = {
@@ -38,7 +46,7 @@ type DatasetConfig = {
     stats: { samples: string; classes: string; avgLen: string };
     specs: DatasetSpecs;
     summaryData: SummaryTableRow[];
-    files: Record<'dysarthric' | 'control', AudioFile[]>;
+    pairs: AudioPair[];
 };
 
 // --- MOCK DATA CONFIGURATION (Fallback) ---
@@ -49,7 +57,7 @@ const DATASETS: Record<DatasetKey, DatasetConfig> = {
         stats: { samples: '-', classes: '-', avgLen: '-' },
         specs: { format: '.wav', sampleRate: '16000 Hz', bitDepth: '16-bit', channels: '1 (Mono)', byteRate: '31 KB/s' },
         summaryData: [],
-        files: { dysarthric: [], control: [] }
+        pairs: []
     },
     uaspeech: {
         name: 'UASpeech_Isolated',
@@ -57,29 +65,30 @@ const DATASETS: Record<DatasetKey, DatasetConfig> = {
         stats: { samples: '-', classes: '-', avgLen: '-' },
         specs: { format: '.wav', sampleRate: '16000 Hz', bitDepth: '16-bit', channels: '1 (Mono)', byteRate: '31 KB/s' },
         summaryData: [],
-        files: { dysarthric: [], control: [] }
+        pairs: []
     }
 };
 
 const EDADashboard: React.FC = () => {
     const navigate = useNavigate();
     const [activeDataset, setActiveDataset] = useState<DatasetKey>('uaspeech');
-    const [activeCategory, setActiveCategory] = useState<'dysarthric' | 'control'>('dysarthric');
     const [datasets, setDatasets] = useState<Record<DatasetKey, DatasetConfig>>(DATASETS);
-    const [selectedFile, setSelectedFile] = useState<AudioFile | null>(null);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [selectedPair, setSelectedPair] = useState<AudioPair | null>(null);
+
+    // Playback State
+    const [playingType, setPlayingType] = useState<'none' | 'control' | 'dysarthric'>('none');
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const canvasRefControl = useRef<HTMLCanvasElement | null>(null);
+    const canvasRefDys = useRef<HTMLCanvasElement | null>(null);
 
     // --- FETCH DATA ---
     useEffect(() => {
         const fetchAll = async () => {
             try {
                 console.log('🔍 Fetching EDA samples from backend...');
-                // Fetch EDA Samples (audio files with waveform & spectrogram)
                 const resSamples = await fetch('http://localhost:8000/api/dataset/eda-samples');
                 const samplesJson = await resSamples.json();
                 console.log('✅ Received data:', samplesJson);
@@ -87,37 +96,57 @@ const EDADashboard: React.FC = () => {
                 setDatasets(prev => {
                     const next = { ...prev };
 
-                    // Merge Samples
-                    if (samplesJson.torgo) {
-                        console.log('📊 TORGO data:', samplesJson.torgo);
-                        next.torgo.files = samplesJson.torgo;
-                        // Update stats if available
-                        if (samplesJson.torgo.dysarthric && samplesJson.torgo.control) {
-                            const totalSamples = samplesJson.torgo.dysarthric.length + samplesJson.torgo.control.length;
-                            next.torgo.stats.samples = totalSamples.toString();
-                            next.torgo.stats.classes = '2';
-                            console.log(`  TORGO: ${totalSamples} samples`);
-                        }
-                    }
-                    if (samplesJson.uaspeech) {
-                        console.log('📊 UASpeech data:', samplesJson.uaspeech);
-                        next.uaspeech.files = samplesJson.uaspeech;
-                        // Update stats if available
-                        if (samplesJson.uaspeech.dysarthric && samplesJson.uaspeech.control) {
-                            const totalSamples = samplesJson.uaspeech.dysarthric.length + samplesJson.uaspeech.control.length;
-                            next.uaspeech.stats.samples = totalSamples.toString();
-                            next.uaspeech.stats.classes = '2';
-                            console.log(`  UASpeech: ${totalSamples} samples`);
-                        }
-                        // Update specs from first file if available
-                        const firstFile = samplesJson.uaspeech.dysarthric[0] || samplesJson.uaspeech.control[0];
-                        if (firstFile && firstFile.specs) {
-                            next.uaspeech.specs = firstFile.specs;
-                            console.log('  Audio specs updated:', firstFile.specs);
-                        }
-                    }
+                    const mapFile = (f: any, type: 'control' | 'dysarthric'): AudioFile => ({
+                        id: f.filename,
+                        name: f.filename,
+                        filename: f.filename,
+                        duration: f.duration.toString() + 's',
+                        durationSec: f.duration,
+                        type: type,
+                        waveform: f.waveform,
+                        spectrogram: f.spectrogram,
+                        url: `/static/samples/${f.filename}`
+                    });
 
-                    console.log('📦 Final merged data:', next);
+                    const processPairs = (items: any[], key: DatasetKey) => {
+                        if (!Array.isArray(items)) return;
+
+                        const pairs: AudioPair[] = items.map((item: any, idx: number) => ({
+                            id: `${key}-pair-${idx}`,
+                            word: item.word || 'Unknown',
+                            control: mapFile(item.control, 'control'),
+                            dysarthric: mapFile(item.dysarthric, 'dysarthric')
+                        }));
+
+                        next[key].pairs = pairs;
+
+                        // Stats
+                        const totalSamples = pairs.length * 2;
+                        next[key].stats.samples = totalSamples.toString();
+                        next[key].stats.classes = "2";
+                        // Calc avg len
+                        const totalDur = pairs.reduce((acc, p) => acc + p.control.durationSec + p.dysarthric.durationSec, 0);
+                        next[key].stats.avgLen = totalSamples > 0 ? (totalDur / totalSamples).toFixed(2) + 's' : '0s';
+
+                        // Hardcoded Summary Data from User Request
+                        if (key === 'uaspeech') {
+                            next[key].summaryData = [
+                                { category: 'Dysarthric', speakers: 8, totalRaw: 5600, trainRaw: 4480, testRaw: 1120 },
+                                { category: 'Non-Dysarthric', speakers: 8, totalRaw: 5610, trainRaw: 4488, testRaw: 1122 },
+                                { category: 'Total', speakers: 16, totalRaw: 11210, trainRaw: 8968, testRaw: 2242 }
+                            ];
+                        } else if (key === 'torgo') {
+                            next[key].summaryData = [
+                                { category: 'Dysarthric', speakers: 8, totalRaw: 1000, trainRaw: 800, testRaw: 200 },
+                                { category: 'Non-Dysarthric', speakers: 7, totalRaw: 1000, trainRaw: 800, testRaw: 200 },
+                                { category: 'Total', speakers: 15, totalRaw: 2000, trainRaw: 1600, testRaw: 400 }
+                            ];
+                        }
+                    };
+
+                    processPairs(samplesJson.torgo, 'torgo');
+                    processPairs(samplesJson.uaspeech, 'uaspeech');
+
                     return next;
                 });
             } catch (e) {
@@ -127,155 +156,188 @@ const EDADashboard: React.FC = () => {
         fetchAll();
     }, []);
 
-    // Set initial selection once data loads
+    // Set initial selection
     useEffect(() => {
-        const currentFiles = datasets[activeDataset].files[activeCategory];
-        if (currentFiles.length > 0 && !selectedFile) {
-            setSelectedFile(currentFiles[0]);
+        const currentPairs = datasets[activeDataset].pairs;
+        if (currentPairs.length > 0 && !selectedPair) {
+            setSelectedPair(currentPairs[0]);
         }
-    }, [datasets, activeDataset, activeCategory]); // Trigger when data updates
-
-    const currentData = datasets[activeDataset];
-    const fileList = currentData.files[activeCategory] || [];
+    }, [datasets, activeDataset]);
 
     // --- HANDLERS ---
     const handleDatasetChange = (ds: DatasetKey) => {
         setActiveDataset(ds);
-        setActiveCategory('dysarthric');
-        setSelectedFile(null); // Will trigger effect above
-        setIsPlaying(false);
+        setSelectedPair(null);
+        setPlayingType('none');
     };
 
-    const handleCategoryChange = (cat: 'dysarthric' | 'control') => {
-        setActiveCategory(cat);
-        setSelectedFile(null);
-        setIsPlaying(false);
+    const handlePairSelect = (pair: AudioPair) => {
+        setSelectedPair(pair);
+        setPlayingType('none');
     };
 
-    const handleFileSelect = (file: AudioFile) => {
-        if (selectedFile?.id === file.id && isPlaying) {
-            togglePlay();
+    const togglePlay = (type: 'control' | 'dysarthric') => {
+        if (playingType === type) {
+            setPlayingType('none'); // Pause
         } else {
-            setSelectedFile(file);
-            setIsPlaying(true); // Auto-play new selection
+            setPlayingType(type); // Play new
         }
     };
 
     // --- AUDIO LOGIC ---
+    // Handle switching audio source when playingType changes or selectedPair changes
     useEffect(() => {
-        if (!selectedFile) return;
-
-        // Reset old audio
+        // Stop any current audio
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.src = "";
+            setCurrentTime(0);
         }
 
-        const url = selectedFile.url
-            ? `http://localhost:8000${selectedFile.url}`
-            : ""; // Fallback or empty if mock
+        if (playingType === 'none' || !selectedPair) return;
+
+        const file = playingType === 'control' ? selectedPair.control : selectedPair.dysarthric;
+        const url = file.url ? `http://localhost:8000${file.url}` : "";
 
         if (url) {
             const audio = new Audio(url);
             audioRef.current = audio;
             audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
             audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
-            audio.addEventListener('ended', () => setIsPlaying(false));
+            audio.addEventListener('ended', () => setPlayingType('none'));
 
-            if (isPlaying) audio.play().catch(e => console.warn("Autoplay blocked", e));
+            audio.play().catch(e => {
+                console.warn("Autoplay blocked", e);
+                setPlayingType('none');
+            });
         }
 
         return () => {
-            if (audioRef.current) {
-                audioRef.current.pause();
-            }
+            if (audioRef.current) audioRef.current.pause();
         };
-    }, [selectedFile]);
+    }, [playingType, selectedPair]);
 
-    useEffect(() => {
-        // Watch playing state for the current audio
-        if (audioRef.current) {
-            if (isPlaying) audioRef.current.play().catch(() => setIsPlaying(false));
-            else audioRef.current.pause();
-        }
-    }, [isPlaying]);
-
-    const togglePlay = () => setIsPlaying(!isPlaying);
-
-    // --- SPECTROGRAM RENDERING (CANVAS) ---
-    useEffect(() => {
-        if (!canvasRef.current || !selectedFile || !selectedFile.spectrogram) return;
-
-        const ctx = canvasRef.current.getContext('2d');
+    // --- SPECTROGRAM RENDERER ---
+    const renderSpectrogram = (canvas: HTMLCanvasElement | null, file: AudioFile) => {
+        if (!canvas || !file.spectrogram) return;
+        const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const spec = selectedFile.spectrogram; // 2D array [freq_bins][time_steps]
-        const width = canvasRef.current.width;
-        const height = canvasRef.current.height;
+        const spec = file.spectrogram;
+        if (!spec || spec.length === 0 || !spec[0]) return;
 
+        const width = canvas.width;
+        const height = canvas.height;
         ctx.clearRect(0, 0, width, height);
 
         const nFreqs = spec.length;
         const nTime = spec[0].length;
-
         const cellWidth = width / nTime;
         const cellHeight = height / nFreqs;
 
-        // Render detailed heatmap
         for (let t = 0; t < nTime; t++) {
             for (let f = 0; f < nFreqs; f++) {
-                const val = spec[f][t] || 0; // 0.0 to 1.0 (approximated)
-
-                // Color Map: Magma-ish (Black -> Purple -> Orange -> Yellow)
-                // Simple implementation:
-                // Low (0.0): Black (0,0,0)
-                // Mid (0.5): Purple (120, 20, 120)
-                // High (1.0): Yellow (255, 255, 0)
-
+                const val = spec[f][t] || 0;
+                // Magma approximation
                 let r, g, b;
                 if (val < 0.5) {
-                    // Black to Purple
                     const p = val * 2;
                     r = p * 120; g = p * 20; b = p * 120;
                 } else {
-                    // Purple to Yellow
                     const p = (val - 0.5) * 2;
-                    r = 120 + p * 135; // 120->255
-                    g = 20 + p * 235;  // 20->255
-                    b = 120 - p * 120; // 120->0
+                    r = 120 + p * 135; g = 20 + p * 235; b = 120 - p * 120;
                 }
-
-                // Index f=0 is low freq (bottom), but canvas y=0 is top.
-                // spec usually has low freq at index 0? Check librosa.
-                // Librosa Mel: index 0 is low freq? 
-                // Let's assume standard: we draw index 0 at BOTTOM (y = height - cellHeight)
-
                 const y = height - (f + 1) * cellHeight;
-
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
-                ctx.fillRect(t * cellWidth, y, cellWidth + 0.5, cellHeight + 0.5); // +0.5 to fix gaps
+                ctx.fillRect(t * cellWidth, y, cellWidth + 0.5, cellHeight + 0.5);
             }
         }
-    }, [selectedFile]);
+    };
 
-    // Waveform: Fallback mock if real not present (during loading)
-    const waveformData = useMemo(() => {
-        if (selectedFile?.waveform) return selectedFile.waveform;
-        // Mock fallback
-        return Array(60).fill(10);
-    }, [selectedFile]);
+    useEffect(() => {
+        if (selectedPair) {
+            renderSpectrogram(canvasRefControl.current, selectedPair.control);
+            renderSpectrogram(canvasRefDys.current, selectedPair.dysarthric);
+        }
+    }, [selectedPair]);
 
-    const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+    // --- RENDER HELPERS ---
+    const renderSignalCard = (type: 'control' | 'dysarthric') => {
+        if (!selectedPair) return null;
+        const file = type === 'control' ? selectedPair.control : selectedPair.dysarthric;
+        const isThisPlaying = playingType === type;
+        const colorClass = type === 'control' ? 'bg-emerald-500' : 'bg-red-500';
+        const bgClass = type === 'control' ? 'bg-emerald-50 dark:bg-emerald-900/10' : 'bg-red-50 dark:bg-red-900/10';
+        const borderClass = type === 'control' ? 'border-emerald-200 dark:border-emerald-800' : 'border-red-200 dark:border-red-800';
+        const textClass = type === 'control' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400';
+
+        const waveform = file.waveform || Array(60).fill(0);
+
+        // Progress bar only if THIS file is playing
+        const showProgress = isThisPlaying;
+        const progressPct = (duration > 0 && showProgress) ? (currentTime / duration) * 100 : 0;
+
+        return (
+            <div className={`p-4 rounded-xl border ${bgClass} ${borderClass} flex flex-col gap-4 relative overflow-hidden transition-all`}>
+                <div className="flex justify-between items-center z-10">
+                    <div className="flex items-center gap-3">
+                        <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase text-white ${colorClass}`}>
+                            {type === 'control' ? 'Control' : 'Dysarthric'}
+                        </div>
+                        <span className={`text-xs font-bold ${textClass}`} title={file.filename}>
+                            {file.filename}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Waveform Area */}
+                <div className="flex items-center gap-4 z-10">
+                    <button
+                        onClick={() => togglePlay(type)}
+                        className={`size-10 rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-105 ${isThisPlaying ? colorClass + ' text-white' : 'bg-white dark:bg-card-dark text-slate-700 dark:text-white'}`}
+                    >
+                        <span className="material-symbols-outlined">{isThisPlaying ? 'pause' : 'play_arrow'}</span>
+                    </button>
+
+                    <div className="flex-1 h-16 flex items-center gap-[1px] relative">
+                        {waveform.map((height, i) => (
+                            <div key={i} className={`flex-1 rounded-full ${colorClass} opacity-80`} style={{ height: `${height}%` }}></div>
+                        ))}
+                        {showProgress && (
+                            <div className="absolute top-0 bottom-0 w-0.5 bg-slate-900 dark:bg-white shadow-[0_0_8px_rgba(0,0,0,0.5)] transition-all linear" style={{ left: `${progressPct}%` }}></div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Spectrogram Mini */}
+                <div className="h-24 w-full bg-black rounded-lg overflow-hidden relative border border-gray-800/50 z-10">
+                    <canvas
+                        ref={type === 'control' ? canvasRefControl : canvasRefDys}
+                        width={300}
+                        height={80}
+                        className="w-full h-full object-cover opacity-90"
+                    />
+                    {showProgress && (
+                        <div className="absolute top-0 bottom-0 w-[1px] bg-white/70" style={{ left: `${progressPct}%` }}></div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const currentData = datasets[activeDataset];
+    const currentPairs = currentData.pairs;
 
     return (
-        <div className="p-6 md:p-8 flex flex-col gap-6">
-            {/* ... Header ... */}
+        <div className="p-6 md:p-8 flex flex-col gap-6 max-w-[1600px] mx-auto">
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Exploratory Data Analysis</h1>
-                    <p className="text-slate-500 dark:text-gray-400">Deep dive into signal characteristics and class balance.</p>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Paired Signal Analysis</h1>
+                    <p className="text-slate-500 dark:text-gray-400">Compare Control vs Dysarthric audio samples.</p>
                 </div>
-                {/* Dataset Selector (Same as before) */}
+                {/* Dataset Selector */}
                 <div className="flex items-center gap-3 bg-white dark:bg-card-dark p-1.5 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
                     <span className="text-xs font-bold text-slate-500 dark:text-gray-400 pl-2 uppercase tracking-wider hidden sm:block">Dataset:</span>
                     <select
@@ -283,180 +345,159 @@ const EDADashboard: React.FC = () => {
                         onChange={(e) => handleDatasetChange(e.target.value as DatasetKey)}
                         className="bg-gray-50 dark:bg-[#151b26] border-none text-sm font-bold text-slate-900 dark:text-white rounded focus:ring-2 focus:ring-primary cursor-pointer py-1.5 pl-3 pr-8"
                     >
-                        <option value="torgo">TORGO_DB_v2</option>
-                        <option value="uaspeech">UASpeech_Isolated</option>
+                        <option value="torgo">TORGO (Paired)</option>
+                        <option value="uaspeech">UASpeech (Paired)</option>
                     </select>
                 </div>
             </div>
 
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Col - Stats & Distribution */}
-                <div className="flex flex-col gap-6">
-                    {/* KPI Cards */}
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm text-center">
-                            <p className="text-primary text-2xl font-bold">{currentData.stats.samples}</p>
-                            <p className="text-xs text-gray-500 uppercase font-semibold mt-1">Samples</p>
-                        </div>
-                        <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm text-center">
-                            <p className="text-primary text-2xl font-bold">{currentData.stats.classes}</p>
-                            <p className="text-xs text-gray-500 uppercase font-semibold mt-1">Classes</p>
-                        </div>
-                        <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm text-center">
-                            <p className="text-primary text-2xl font-bold">{currentData.stats.avgLen}</p>
-                            <p className="text-xs text-gray-500 uppercase font-semibold mt-1">Avg Len</p>
-                        </div>
+            {/* KPI Cards Row (Moved to Top) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between px-6">
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Total Samples</p>
+                        <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{currentData.stats.samples}</p>
                     </div>
-
-                    {/* ... Summary Table ... (Keep existing layout) */}
-                    <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white">Dataset Summary</h3>
-                                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">{currentData.name}</p>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                {/* ... Table Header ... */}
-                                <thead>
-                                    <tr className="border-b border-gray-100 dark:border-gray-800 text-[10px] uppercase tracking-wider text-slate-500 dark:text-gray-400 font-bold">
-                                        <th className="pb-3 pr-2">Class</th>
-                                        <th className="pb-3 px-2 text-right">Speakers</th>
-                                        <th className="pb-3 px-2 text-right">Total</th>
-                                        <th className="pb-3 pl-2 text-right">Train/Test</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
-                                    {currentData.summaryData.map((row, idx) => (
-                                        <tr key={idx} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                            <td className="py-3 pr-2 font-semibold text-slate-700 dark:text-gray-300">{row.category}</td>
-                                            <td className="py-3 px-2 text-right font-mono text-slate-500">{row.speakers}</td>
-                                            <td className="py-3 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">{row.totalRaw.toLocaleString()}</td>
-                                            <td className="py-3 pl-2 text-right font-mono text-slate-500 text-xs">
-                                                {row.trainRaw.toLocaleString()} / {row.testRaw.toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {/* Footer */}
-                                    <tr className="bg-gray-50/50 dark:bg-white/5 font-bold text-slate-900 dark:text-white">
-                                        <td className="py-3 pr-2">Total</td>
-                                        <td className="py-3 px-2 text-right font-mono">{currentData.summaryData.reduce((a, b) => a + b.speakers, 0)}</td>
-                                        <td className="py-3 px-2 text-right font-mono">{currentData.summaryData.reduce((a, b) => a + b.totalRaw, 0).toLocaleString()}</td>
-                                        <td className="py-3 pl-2 text-right font-mono"></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Technical Specifications */}
-                    <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex-1">
-                        <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-slate-400">settings_voice</span>
-                            Audio Specifications
-                        </h3>
-                        <div className="grid grid-cols-2 gap-y-5 gap-x-2 text-sm">
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">File Format</span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.format}</span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Sample Rate</span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.sampleRate}</span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Bit Depth</span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.bitDepth}</span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Channels</span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.channels}</span>
-                            </div>
-                            <div className="flex flex-col gap-1 col-span-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Byte Rate</span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white">{currentData.specs.byteRate}</span>
-                            </div>
-                        </div>
+                    <div className="size-10 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                        <span className="material-symbols-outlined">library_music</span>
                     </div>
                 </div>
-
-                {/* Right Col - Audio Visualization */}
-                <div className="lg:col-span-2 bg-white dark:bg-card-dark rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden">
-                    {/* Header / Selector */}
-                    <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#151b26]">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    Signal Inspector
-                                    <span className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-500 uppercase">
-                                        {activeCategory === 'dysarthric' ? 'Impaired' : 'Control'}
-                                    </span>
-                                </h3>
-                            </div>
-                            <div className="flex items-center gap-4 bg-white dark:bg-card-dark p-1 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
-                                <button onClick={() => handleCategoryChange('dysarthric')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${activeCategory === 'dysarthric' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Dysarthric</button>
-                                <button onClick={() => handleCategoryChange('control')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${activeCategory === 'control' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Non-Dysarthric</button>
-                            </div>
+                <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between px-6">
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Classes</p>
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <p className="text-3xl font-bold text-slate-900 dark:text-white">{currentData.stats.classes}</p>
+                            <span className="text-xs font-mono text-gray-400">(Con/Dys)</span>
                         </div>
                     </div>
+                    <div className="size-10 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                        <span className="material-symbols-outlined">category</span>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between px-6">
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Avg Duration</p>
+                        <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{currentData.stats.avgLen}</p>
+                    </div>
+                    <div className="size-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <span className="material-symbols-outlined">timer</span>
+                    </div>
+                </div>
+            </div>
 
-                    {/* File List */}
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex gap-3 overflow-x-auto no-scrollbar bg-white dark:bg-card-dark min-h-[70px]">
-                        {fileList.length === 0 && <div className="text-xs text-gray-500 p-2 italic">No samples available. Run training first.</div>}
-                        {fileList.map((file) => (
+            {/* Main Content: List & Visuals */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[600px] min-h-[500px]">
+                {/* LIST COLUMN (Scrollable) */}
+                <div className="lg:col-span-4 flex flex-col bg-white dark:bg-card-dark rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden h-[500px] lg:h-full">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#151b26] flex justify-between items-center">
+                        <h3 className="font-bold text-slate-900 dark:text-white">Sample Pairs</h3>
+                        <span className="text-xs font-mono bg-white dark:bg-black/20 px-2 py-0.5 rounded text-gray-500">{currentPairs.length}</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                        {currentPairs.length === 0 && <div className="text-center p-8 text-gray-400 text-sm">No samples found.</div>}
+
+                        {currentPairs.map(pair => (
                             <button
-                                key={file.id}
-                                onClick={() => handleFileSelect(file)}
-                                className={`flex flex-col items-start min-w-[140px] p-2 rounded-lg border text-left transition-all ${selectedFile?.id === file.id
+                                key={pair.id}
+                                onClick={() => handlePairSelect(pair)}
+                                className={`w-full p-3 rounded-lg border text-left transition-all group flex flex-col gap-1 ${selectedPair?.id === pair.id
                                     ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5'
                                     }`}
                             >
-                                <span className={`text-xs font-bold truncate w-full ${selectedFile?.id === file.id ? 'text-primary' : 'text-slate-700 dark:text-gray-300'}`}>{file.name}</span>
-                                <div className="flex justify-between w-full mt-1">
-                                    <span className="text-[10px] text-gray-400 font-mono">{file.duration}</span>
+                                <div className="flex justify-between items-center w-full">
+                                    <span className={`font-bold ${selectedPair?.id === pair.id ? 'text-primary' : 'text-slate-700 dark:text-white'}`}>
+                                        Word: "{pair.word}"
+                                    </span>
+                                    {selectedPair?.id === pair.id && <span className="text-[10px] bg-primary text-white px-1.5 rounded">ACTIVE</span>}
+                                </div>
+                                <div className="flex gap-2 text-[10px] text-gray-500 font-mono mt-1">
+                                    <span className={`px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400`}>Con: {pair.control.duration}</span>
+                                    <span className={`px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400`}>Dys: {pair.dysarthric.duration}</span>
                                 </div>
                             </button>
                         ))}
                     </div>
+                </div>
 
-                    <div className="p-6 flex flex-col gap-8 flex-1 bg-white dark:bg-card-dark">
-                        {/* Waveform */}
-                        <div className="flex flex-col gap-2">
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <button onClick={togglePlay} className={`size-8 rounded-full ${isPlaying ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800 text-slate-700 dark:text-white'} hover:scale-105 flex items-center justify-center transition-all`}>
-                                        <span className="material-symbols-outlined text-lg">{isPlaying ? 'pause' : 'play_arrow'}</span>
-                                    </button>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amplitude / Time</span>
-                                </div>
-                                <span className="text-xs font-mono text-slate-400">
-                                    {currentTime.toFixed(1)}s / {duration.toFixed(1)}s
-                                </span>
-                            </div>
-                            <div className="h-32 w-full bg-slate-50 dark:bg-black/20 rounded-lg border border-gray-100 dark:border-gray-800 relative flex items-center px-2 gap-[2px] sm:gap-1 overflow-hidden">
-                                {waveformData.map((height, i) => (
-                                    <div key={i} className={`flex-1 rounded-full transition-all duration-300 ${selectedFile?.type === 'dysarthric' ? 'bg-red-400/80 dark:bg-red-500/60' : 'bg-primary/80 dark:bg-primary/60'}`} style={{ height: `${height}%` }}></div>
-                                ))}
-                                <div className="absolute top-0 bottom-0 w-0.5 bg-slate-900 dark:bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] z-10 transition-all duration-75 linear" style={{ left: `${progressPct}%` }}></div>
-                            </div>
+                {/* VISUALS COLUMN */}
+                <div className="lg:col-span-8 flex flex-col gap-6 h-full overflow-y-auto pr-1">
+                    {/* Control Card */}
+                    {renderSignalCard('control')}
+                    {/* Dysarthric Card */}
+                    {renderSignalCard('dysarthric')}
+
+                    {!selectedPair && (
+                        <div className="h-full flex items-center justify-center text-gray-400 italic rounded-xl border border-dashed border-gray-200 dark:border-gray-800">
+                            Select a pair from the list to examine signals
                         </div>
+                    )}
+                </div>
+            </div>
 
-                        {/* Spectrogram Canvas */}
-                        <div className="flex flex-col gap-2 flex-1">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mel-Spectrogram (Real Data)</span>
-                            </div>
-                            <div className="w-full h-48 rounded-lg overflow-hidden relative bg-black">
-                                {selectedFile?.spectrogram ? (
-                                    <canvas ref={canvasRef} width={300} height={80} className="w-full h-full object-cover opacity-90" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Select a file to view Spectrogram</div>
+            {/* Bottom Row: Specs & Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Dataset Summary Table */}
+                <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-4">Dataset Distribution</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-gray-100 dark:border-gray-800 text-[10px] uppercase tracking-wider text-slate-500 dark:text-gray-400 font-bold">
+                                    <th className="pb-3 pr-2">Sub-Class</th>
+                                    <th className="pb-3 px-2 text-right">Unique Speakers</th>
+                                    <th className="pb-3 px-2 text-right">Samples</th>
+                                    <th className="pb-3 px-2 text-right">Train/Test Est.</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
+                                {currentData.summaryData.map((row, idx) => (
+                                    <tr key={idx}>
+                                        <td className="py-3 pr-2 font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                                            <div className={`size-2 rounded-full ${row.category === 'Control' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                            {row.category}
+                                        </td>
+                                        <td className="py-3 px-2 text-right font-mono text-slate-500">{row.speakers}</td>
+                                        <td className="py-3 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">{row.totalRaw}</td>
+                                        <td className="py-3 px-2 text-right font-mono text-xs text-slate-500">{row.trainRaw} / {row.testRaw}</td>
+                                    </tr>
+                                ))}
+                                {currentData.summaryData.length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="py-4 text-center text-xs text-gray-500 italic">No summary data available.</td>
+                                    </tr>
                                 )}
-                                <div className="absolute top-0 bottom-0 w-[1px] bg-white/50 z-10" style={{ left: `${progressPct}%` }}></div>
-                            </div>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Technical Specifications */}
+                <div className="bg-white dark:bg-card-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-slate-400">settings_voice</span>
+                        Audio Specifications
+                    </h3>
+                    <div className="grid grid-cols-2 gap-y-5 gap-x-2 text-sm">
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">File Format</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.format}</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Sample Rate</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.sampleRate}</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Bit Depth</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.bitDepth}</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Channels</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white bg-gray-50 dark:bg-white/5 px-2 py-1 rounded w-fit">{currentData.specs.channels}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 col-span-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-gray-400 tracking-wider">Byte Rate</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">{currentData.specs.byteRate}</span>
                         </div>
                     </div>
                 </div>

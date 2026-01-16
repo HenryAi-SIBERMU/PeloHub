@@ -1,5 +1,6 @@
 import os
 import io
+import json
 import tensorflow as tf
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -363,24 +364,44 @@ async def get_evaluation_details():
         }
         
         # 1. Benchmark Summary
-        bench_path = os.path.join(OUTPUTS_DIR, "benchmark_summary.json")
+        bench_path = os.path.join(config.OUTPUTS_DIR, "benchmark_summary.json")
         if os.path.exists(bench_path):
             with open(bench_path, 'r') as f:
                 data["summary"] = json.load(f)
                 
         # 2. Efficiency
-        eff_path = os.path.join(OUTPUTS_DIR, "model_efficiency.json")
+        eff_path = os.path.join(config.OUTPUTS_DIR, "model_efficiency.json")
         if os.path.exists(eff_path):
              with open(eff_path, 'r') as f:
                 data["efficiency"] = json.load(f)
         
-        # 3. Detailed Eval Files (*_eval.json)
-        for filename in os.listdir(OUTPUTS_DIR):
+        # 3. Detailed Eval Files (*_eval.json) & History (*_history.csv)
+        for filename in os.listdir(config.OUTPUTS_DIR):
             if filename.endswith("_eval.json"):
                 # Key is typically "modelname_datasetname"
                 key = filename.replace("_eval.json", "")
-                with open(os.path.join(OUTPUTS_DIR, filename), 'r') as f:
-                    data["details"][key] = json.load(f)
+                with open(os.path.join(config.OUTPUTS_DIR, filename), 'r') as f:
+                    data["details"].setdefault(key, {})
+                    data["details"][key].update(json.load(f))
+
+            elif filename.endswith("_report.json"):
+                key = filename.replace("_report.json", "")
+                with open(os.path.join(config.OUTPUTS_DIR, filename), 'r') as f:
+                    data["details"].setdefault(key, {})
+                    data["details"][key]["classification_report"] = json.load(f)
+
+            elif filename.endswith("_history.csv"):
+                # e.g. cnn_stft_UASpeech_history.csv
+                key = filename.replace("_history.csv", "")
+                import pandas as pd
+                try:
+                    df = pd.read_csv(os.path.join(config.OUTPUTS_DIR, filename))
+                    # Convert to list of dicts: [{epoch:0, loss:0.5...}, ...]
+                    history_data = df.to_dict(orient='records')
+                    data["details"].setdefault(key, {})
+                    data["details"][key]["history"] = history_data
+                except Exception as e:
+                    print(f"Error reading history CSV {filename}: {e}")
                     
         return data
     except Exception as e:

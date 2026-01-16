@@ -1,0 +1,66 @@
+[
+    {
+        "model": "cnn_stft",
+        "dataset": "UASpeech",
+        "accuracy": 0.8340767172167708,
+        "inference_time_ms": 4.7005452182439695,
+        "training_time_sec": 1415.8408200740814,
+        "run_name": "cnn_stft_UASpeech"
+    },
+    {
+        "model": "mobilenetv3",
+        "dataset": "UASpeech",
+        "accuracy": 0.927743086529884,
+        "inference_time_ms": 8.935920688108501,
+        "training_time_sec": 800.3774900436401,
+        "run_name": "mobilenetv3_UASpeech"
+    },
+    {
+        "model": "efficientnetb0",
+        "dataset": "UASpeech",
+        "accuracy": 0.7555753791257805,
+        "inference_time_ms": 13.74610612479626,
+        "training_time_sec": 910.8845160007477,
+        "run_name": "efficientnetb0_UASpeech"
+    },
+    {
+        "model": "nasnetmobile",
+        "dataset": "UASpeech",
+        "accuracy": 0.8947368421052632,
+        "inference_time_ms": 36.0889906972567,
+        "training_time_sec": 1219.9998717308044,
+        "run_name": "nasnetmobile_UASpeech"
+    },
+    {
+        "model": "cnn_stft",
+        "dataset": "TORGO",
+        "accuracy": 0.855,
+        "inference_time_ms": 9.356101751327515,
+        "training_time_sec": 309.69912600517273,
+        "run_name": "cnn_stft_TORGO"
+    },
+    {
+        "model": "mobilenetv3",
+        "dataset": "TORGO",
+        "accuracy": 0.79,
+        "inference_time_ms": 39.98284935951233,
+        "training_time_sec": 222.26650261878967,
+        "run_name": "mobilenetv3_TORGO"
+    },
+    {
+        "model": "efficientnetb0",
+        "dataset": "TORGO",
+        "accuracy": 0.79,
+        "inference_time_ms": 62.09981441497803,
+        "training_time_sec": 278.63176131248474,
+        "run_name": "efficientnetb0_TORGO"
+    },
+    {
+        "model": "nasnetmobile",
+        "dataset": "TORGO",
+        "accuracy": 0.72,
+        "inference_time_ms": 130.57083249092102,
+        "training_time_sec": 554.4422559738159,
+        "run_name": "nasnetmobile_TORGO"
+    }
+]

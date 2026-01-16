@@ -56,7 +56,8 @@ const AppContent = () => {
   return (
     <Layout>
       <AnimatePresence mode="wait">
-        <Routes location={location}>
+        {/* @ts-ignore */}
+        <Routes location={location} key={location.pathname}>
           <Route path="/" element={
             <PageTransition>
               <Dashboard />

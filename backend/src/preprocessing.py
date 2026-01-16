@@ -90,7 +90,7 @@ def get_mfcc(audio):
         num_spectrogram_bins=num_spectrogram_bins,
         sample_rate=config.SAMPLE_RATE,
         lower_edge_hertz=20.0,
-        upper_edge_hertz=4000.0
+        upper_edge_hertz=config.SAMPLE_RATE / 2.0 # Nyquist Frequency
     )
     mel_spectrograms = tf.tensordot(spectrogram, linear_to_mel_weight_matrix, 1)
     mel_spectrograms.set_shape(spectrogram.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:]))

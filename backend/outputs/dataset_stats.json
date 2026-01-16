@@ -1,0 +1,50 @@
+{
+    "uaspeech": {
+        "name": "UASpeech",
+        "stats": {
+            "samples": "11,210",
+            "classes": "2",
+            "avgLen": "N/A"
+        },
+        "summaryData": [
+            {
+                "category": "Control",
+                "speakers": 8,
+                "totalRaw": 5600,
+                "trainRaw": 4480,
+                "testRaw": 1120
+            },
+            {
+                "category": "Control",
+                "speakers": 8,
+                "totalRaw": 5610,
+                "trainRaw": 4488,
+                "testRaw": 1122
+            }
+        ]
+    },
+    "torgo": {
+        "name": "TORGO",
+        "stats": {
+            "samples": "2,000",
+            "classes": "2",
+            "avgLen": "N/A"
+        },
+        "summaryData": [
+            {
+                "category": "Control",
+                "speakers": 15,
+                "totalRaw": 1000,
+                "trainRaw": 800,
+                "testRaw": 200
+            },
+            {
+                "category": "Control",
+                "speakers": 15,
+                "totalRaw": 1000,
+                "trainRaw": 800,
+                "testRaw": 200
+            }
+        ]
+    }
+}

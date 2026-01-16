@@ -1,0 +1,45 @@
+{
+    "model_name": "cnn_stft_TORGO",
+    "dataset": "Combined_UASpeech_TORGO",
+    "accuracy": 0.855,
+    "flops": 561093068,
+    "params": 110498,
+    "inference_time_ms": 13.170037269592285,
+    "classification_report": {
+        "control": {
+            "precision": 0.7795275590551181,
+            "recall": 0.99,
+            "f1-score": 0.8722466960352423,
+            "support": 100.0
+        },
+        "dysarthric": {
+            "precision": 0.9863013698630136,
+            "recall": 0.72,
+            "f1-score": 0.8323699421965318,
+            "support": 100.0
+        },
+        "accuracy": 0.855,
+        "macro avg": {
+            "precision": 0.8829144644590659,
+            "recall": 0.855,
+            "f1-score": 0.8523083191158871,
+            "support": 200.0
+        },
+        "weighted avg": {
+            "precision": 0.8829144644590659,
+            "recall": 0.855,
+            "f1-score": 0.8523083191158871,
+            "support": 200.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            99,
+            1
+        ],
+        [
+            28,
+            72
+        ]
+    ]
+}
