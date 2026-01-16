@@ -43,6 +43,10 @@ server {
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
         
+        # SSL/SNI Configuration for Cloud Run (CRITICAL for HTTPS Upstreams)
+        proxy_ssl_server_name on;
+        proxy_ssl_protocols TLSv1.2 TLSv1.3;
+        
         # CORS headers (optional if handled by backend, but good for safety)
         add_header 'Access-Control-Allow-Origin' '*' always;
     }
