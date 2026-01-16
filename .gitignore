@@ -30,8 +30,8 @@ Desktop.ini
 .idea/
 
 # Backend output / Large Files
-backend/models/*.h5
-backend/models/*.keras
+# backend/models/*.h5 (Uncommented to allow uploading trained models to Cloud Run)
+# backend/models/*.keras
 !backend/models/.gitkeep
 backend/debug_tf.py
 
