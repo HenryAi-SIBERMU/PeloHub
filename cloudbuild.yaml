@@ -5,12 +5,12 @@ steps:
   
   # Build Backend Image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/dysarthria-backend', './backend']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/pelohub-api', './backend']
     id: 'Build Backend'
 
   # Push Backend Image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/dysarthria-backend']
+    args: ['push', 'gcr.io/$PROJECT_ID/pelohub-api']
     id: 'Push Backend'
 
   # Deploy Backend to Cloud Run
@@ -20,9 +20,9 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'dysarthria-backend'
+      - 'pelohub-api'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/dysarthria-backend'
+      - 'gcr.io/$PROJECT_ID/pelohub-api'
       - '--region'
       - 'asia-southeast2'
       - '--platform'
@@ -39,7 +39,7 @@ steps:
     entrypoint: '/bin/bash'
     args: 
       - '-c'
-      - 'gcloud run services describe dysarthria-backend --platform managed --region asia-southeast2 --format "value(status.url)" > /workspace/backend_url.txt && cat /workspace/backend_url.txt'
+      - 'gcloud run services describe pelohub-api --platform managed --region asia-southeast2 --format "value(status.url)" > /workspace/backend_url.txt && cat /workspace/backend_url.txt'
     id: 'Fetch Backend URL'
 
   # ==========================================
@@ -54,12 +54,12 @@ steps:
       - |
         export BACKEND_URL=$$(cat /workspace/backend_url.txt)
         echo "Building Frontend with VITE_API_URL=$$BACKEND_URL"
-        docker build --build-arg VITE_API_URL=$$BACKEND_URL -t gcr.io/$PROJECT_ID/dysarthria-dashboard ./frontend
+        docker build --build-arg VITE_API_URL=$$BACKEND_URL -t gcr.io/$PROJECT_ID/pelohub ./frontend
     id: 'Build Frontend'
 
   # Push Frontend Image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/dysarthria-dashboard']
+    args: ['push', 'gcr.io/$PROJECT_ID/pelohub']
     id: 'Push Frontend'
 
   # Deploy Frontend to Cloud Run
@@ -68,9 +68,9 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'dysarthria-dashboard'
+      - 'pelohub'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/dysarthria-dashboard'
+      - 'gcr.io/$PROJECT_ID/pelohub'
       - '--region'
       - 'asia-southeast2'
       - '--platform'
@@ -79,8 +79,8 @@ steps:
     id: 'Deploy Frontend'
 
 images:
-  - 'gcr.io/$PROJECT_ID/dysarthria-backend'
-  - 'gcr.io/$PROJECT_ID/dysarthria-dashboard'
+  - 'gcr.io/$PROJECT_ID/pelohub-api'
+  - 'gcr.io/$PROJECT_ID/pelohub'
 
 options:
   logging: CLOUD_LOGGING_ONLY
