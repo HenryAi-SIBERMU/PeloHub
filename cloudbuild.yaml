@@ -52,9 +52,9 @@ steps:
     args:
       - '-c'
       - |
-        export BACKEND_URL=$(cat /workspace/backend_url.txt)
-        echo "Building Frontend with VITE_API_URL=$BACKEND_URL"
-        docker build --build-arg VITE_API_URL=$BACKEND_URL -t gcr.io/$PROJECT_ID/dysarthria-dashboard ./frontend
+        export BACKEND_URL=$$(cat /workspace/backend_url.txt)
+        echo "Building Frontend with VITE_API_URL=$$BACKEND_URL"
+        docker build --build-arg VITE_API_URL=$$BACKEND_URL -t gcr.io/$PROJECT_ID/dysarthria-dashboard ./frontend
     id: 'Build Frontend'
 
   # Push Frontend Image
