@@ -26,6 +26,6 @@ coverage.xml
 # Make sure 'models/' is included if we need pre-trained models.
 # outputs/ can be ignored as it's for local visualization.
 
-outputs/
+# outputs/ (Required for Cloud Run Persistence)
 # Uncomment below if you download large datasets locally
 # data/
