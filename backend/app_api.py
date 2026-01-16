@@ -109,17 +109,48 @@ async def predict_audio(model_name: str, file: UploadFile = File(...)):
     if model_name not in config.MODELS:
         raise HTTPException(status_code=400, detail=f"Model tidak dikenal. Pilihan: {list(config.MODELS.keys())}")
     
-    # Validasi File
-    if not file.filename.endswith(('.wav', '.WAV')):
-        raise HTTPException(status_code=400, detail="Hanya file .wav yang didukung.")
+    # Supported extensions
+    ALLOWED_EXTENSIONS = ('.wav', '.WAV', '.webm', '.WEBM', '.ogg', '.OGG', '.mp3', '.MP3')
+    if not file.filename.endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail=f"Format file tidak didukung. Gunakan: {ALLOWED_EXTENSIONS}")
 
     try:
         # Membaca konten file
         file_content = await file.read()
         
-        # Decode Audio menggunakan fungsi TensorFlow (sama seperti saat training)
-        # Kita perlu simpan sementara atau parsing stream byte
-        # tf.audio.decode_wav mengharapkan string byte
+        # --- AUDIO CONVERSION LOGIC ---
+        # Browser recording biasanya .webm atau .ogg. TensorFlow butuh .wav PCM 16-bit logic.
+        # Kita gunakan pydub untuk standardisasi ke WAV.
+        import pydub
+        
+        # Load audio from bytes
+        try:
+            # Pydub auto-detect format based on content usually, but extension helps
+            # Wrap bytes in BytesIO
+            audio_segment = pydub.AudioSegment.from_file(io.BytesIO(file_content))
+            
+            # Convert to standard WAV (16-bit PCM, Mono, 16000Hz preferred)
+            # Force Mono
+            audio_segment = audio_segment.set_channels(1) 
+            
+            # Force 16-bit PCM (2 bytes) because TensorFlow decode_wav ONLY supports 16-bit
+            # Pydub: 1 byte=8bit, 2=16bit, 4=32bit
+            audio_segment = audio_segment.set_sample_width(2)
+            
+            # Export to buffer as WAV
+            wav_io = io.BytesIO()
+            # Explicitly specify format parameters to ensure compatibility
+            audio_segment.export(wav_io, format="wav", parameters=["-acodec", "pcm_s16le"])
+            file_content = wav_io.getvalue()
+            
+            print(f"✅ Audio Conversion Success: {file.filename} -> WAV 16-bit (Duration: {len(audio_segment)}ms)")
+            
+        except Exception as e:
+            print(f"⚠️ Pydub Conversion Failed: {e}. Trying raw decode...")
+            # If pydub fails (maybe raw wav already), invoke TF directly
+            pass
+
+        # Decode Audio menggunakan fungsi TensorFlow
         audio_tensor, sample_rate = tf.audio.decode_wav(file_content, desired_channels=1)
         audio_tensor = tf.squeeze(audio_tensor, axis=-1)
         
