@@ -501,7 +501,7 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
         {/* LEFT COLUMN: INPUT & VISUALIZATION */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 min-w-0">
 
           {/* Toggle Switch */}
           <div className="bg-gray-200 dark:bg-gray-800 p-1 rounded-lg flex w-full max-w-md mx-auto lg:mx-0">
@@ -593,24 +593,24 @@ const LivePrediction: React.FC<LivePredictionProps> = ({ onAnalysisComplete }) =
             <div className="bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4">
 
               {/* Header & Controls */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex flex-col gap-1">
-                  <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 truncate">
                     <span className="material-symbols-outlined text-primary">equalizer</span>
-                    {t('live.signal_analysis')}
+                    <span className="truncate">{t('live.signal_analysis')}</span>
                   </h3>
                   {selectedFile && (
-                    <p className="text-xs text-slate-500 font-mono pl-7 max-w-md truncate" title={selectedFile.name}>
+                    <p className="text-xs text-slate-500 font-mono pl-7 max-w-full truncate" title={selectedFile.name}>
                       {selectedFile.name}
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{fileMetadata.format}</span>
-                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{fileMetadata.bitDepth}</span>
-                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{audioBuffer.sampleRate}Hz</span>
-                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{audioBuffer.numberOfChannels === 1 ? 'Mono' : 'Stereo'}</span>
-                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded">{formatTime(duration)}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded whitespace-nowrap">{fileMetadata.format}</span>
+                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded whitespace-nowrap">{fileMetadata.bitDepth}</span>
+                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded whitespace-nowrap">{audioBuffer.sampleRate}Hz</span>
+                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded whitespace-nowrap">{audioBuffer.numberOfChannels === 1 ? 'Mono' : 'Stereo'}</span>
+                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-slate-500 font-mono px-2 py-1 rounded whitespace-nowrap">{formatTime(duration)}</span>
                 </div>
               </div>
 

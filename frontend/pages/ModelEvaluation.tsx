@@ -236,21 +236,21 @@ const ModelEvaluation: React.FC = () => {
     return (
         <div className="p-6 md:p-8 flex flex-col gap-8 pb-20">
             {/* Header & Tabs */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Model Evaluation</h1>
-                    <p className="text-slate-500 dark:text-gray-400">Comprehensive performance analysis: <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded ml-2">Binary Classification (Disartria vs Non-Disartria)</span></p>
+                    <p className="text-slate-500 dark:text-gray-400 mt-1">Comprehensive performance analysis: <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded inline-block mt-1 sm:mt-0">Binary Classification (Disartria vs Non-Disartria)</span></p>
                 </div>
 
                 {/* Actions Group */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                     {/* Dataset Selector */}
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <span className="text-xs font-bold text-gray-500 uppercase px-2">Dataset:</span>
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <span className="text-xs font-bold text-gray-500 uppercase px-2 whitespace-nowrap">Dataset:</span>
                         <select
                             value={selectedDataset}
                             onChange={(e) => setSelectedDataset(e.target.value)}
-                            className="bg-transparent text-sm font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                            className="bg-transparent text-sm font-bold text-slate-900 dark:text-white outline-none cursor-pointer w-full sm:w-auto"
                         >
                             <option value="UASpeech">UASpeech</option>
                             <option value="TORGO">TORGO</option>
@@ -258,17 +258,17 @@ const ModelEvaluation: React.FC = () => {
                     </div>
 
                     {/* Main Tab Switcher */}
-                    <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+                    <div className="flex p-1 bg-gray-200 dark:bg-gray-800 rounded-lg shadow-inner">
                         <button
                             onClick={() => setActiveTab('overview')}
-                            className={`flex items-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
                         >
                             <span className="material-symbols-outlined text-[18px]">dashboard</span>
                             Overview
                         </button>
                         <button
                             onClick={() => setActiveTab('deep-dive')}
-                            className={`flex items-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'deep-dive' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 py-2 px-6 rounded-md text-sm font-bold transition-all ${activeTab === 'deep-dive' ? 'bg-white dark:bg-primary text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}
                         >
                             <span className="material-symbols-outlined text-[18px]">manage_search</span>
                             Deep Dive
@@ -418,42 +418,45 @@ const ModelEvaluation: React.FC = () => {
                 <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                     {/* MODEL SELECTOR BAR */}
-                    <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center gap-4 w-full md:w-auto">
-                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider hidden md:block">Active Model:</span>
-                            <select
-                                value={selectedModelKey}
-                                onChange={(e) => setSelectedModelKey(e.target.value)}
-                                className="bg-gray-50 dark:bg-[#151b26] border border-gray-200 dark:border-gray-700 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-primary focus:border-primary block w-full md:w-64 p-2.5 font-bold cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                            >
-                                <option value="cnn">CNN-STFT v2 (Lightweight)</option>
-                                <option value="mobilenet">MobileNetV3Small (Efficient)</option>
-                                <option value="resnet">EfficientNetB0 (Benchmark)</option>
-                                <option value="vgg">NASNetMobile (Benchmark)</option>
-                            </select>
-                            <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${activeModel.badgeColor}`}>
-                                {activeModel.badge}
-                            </span>
+                    {/* MODEL SELECTOR BAR */}
+                    <div className="bg-white dark:bg-card-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-md flex flex-col xl:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider hidden xl:block">Active Model:</span>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <select
+                                    value={selectedModelKey}
+                                    onChange={(e) => setSelectedModelKey(e.target.value)}
+                                    className="bg-gray-50 dark:bg-[#151b26] border border-gray-200 dark:border-gray-700 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-primary focus:border-primary block w-full sm:w-64 p-2.5 font-bold cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <option value="cnn">CNN-STFT v2 (Lightweight)</option>
+                                    <option value="mobilenet">MobileNetV3Small (Efficient)</option>
+                                    <option value="resnet">EfficientNetB0 (Benchmark)</option>
+                                    <option value="vgg">NASNetMobile (Benchmark)</option>
+                                </select>
+                                <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider h-full ${activeModel.badgeColor}`}>
+                                    {activeModel.badge}
+                                </span>
+                            </div>
                         </div>
 
-                        <div className="flex gap-8 w-full md:w-auto justify-around md:justify-end">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 w-full xl:w-auto justify-items-center sm:justify-items-end">
                             <div className="text-center">
                                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">Accuracy</span>
                                 <p className={`text-xl font-black ${activeModel.color}`}>{activeModel.metrics.acc}</p>
                             </div>
-                            <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
+                            <div className="text-center border-l-0 sm:border-l border-gray-200 dark:border-gray-700 pl-0 sm:pl-4 xl:pl-8">
                                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">Precision</span>
                                 <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.prec}</p>
                             </div>
-                            <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
+                            <div className="text-center border-l-0 sm:border-l border-gray-200 dark:border-gray-700 pl-0 sm:pl-4 xl:pl-8">
                                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">Recall</span>
                                 <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.rec}</p>
                             </div>
-                            <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
+                            <div className="text-center border-l-0 sm:border-l border-gray-200 dark:border-gray-700 pl-0 sm:pl-4 xl:pl-8">
                                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">F1 Score</span>
                                 <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.f1}</p>
                             </div>
-                            <div className="text-center border-l border-gray-200 dark:border-gray-700 pl-8">
+                            <div className="text-center border-l-0 sm:border-l border-gray-200 dark:border-gray-700 pl-0 sm:pl-4 xl:pl-8 col-span-2 sm:col-span-1">
                                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5">AUROC</span>
                                 <p className="text-xl font-black text-slate-900 dark:text-white">{activeModel.metrics.auroc}</p>
                             </div>
@@ -873,7 +876,7 @@ const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
     const [hoveredCell, setHoveredCell] = useState<{ r: number, c: number } | null>(null);
 
     return (
-        <div className="flex-1 p-6 flex flex-col items-center justify-center bg-gray-50/50 dark:bg-[#151b26]/50 relative">
+        <div className="flex-1 p-4 sm:p-6 flex flex-col items-center justify-center bg-gray-50/50 dark:bg-[#151b26]/50 relative w-full overflow-hidden">
             {/* Tooltip */}
             {hoveredCell !== null && (
                 <div className="absolute top-4 right-4 z-20 bg-white dark:bg-card-dark p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 text-xs animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
@@ -911,18 +914,18 @@ const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
                 </div>
             )}
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto max-w-full pb-2">
                 {/* Y-Axis Label (Rotated) */}
-                <div className="-rotate-90 text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase whitespace-nowrap w-4 h-full flex items-center justify-center">
+                <div className="-rotate-90 text-[8px] sm:text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase whitespace-nowrap w-3 sm:w-4 h-full flex items-center justify-center shrink-0">
                     True Label
                 </div>
 
                 <div>
                     {/* Grid Header (Spacer + Column Labels) */}
-                    <div className="grid grid-cols-[auto_1fr_1fr] gap-3 mb-2">
-                        <div className="w-24"></div> {/* Spacer for row labels */}
-                        <div className="text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dysarthric</div>
-                        <div className="text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Non-Dysarthric</div>
+                    <div className="grid grid-cols-[auto_1fr_1fr] gap-2 sm:gap-3 mb-2">
+                        <div className="w-16 sm:w-24"></div> {/* Spacer for row labels */}
+                        <div className="text-center text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Dysarthric</div>
+                        <div className="text-center text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Non-Dysarthric</div>
                     </div>
 
                     {/* Check if CM data exists */}
@@ -930,19 +933,19 @@ const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
                         <div className="flex flex-col gap-3">
                             {[0, 1].map((r) => (
                                 <div key={r} className="grid grid-cols-[auto_1fr_1fr] gap-3 items-center">
-                                    <div className="w-24 text-right"><div className="h-3 w-12 bg-gray-200 dark:bg-gray-700/50 rounded ml-auto animate-pulse"></div></div>
-                                    <div className="size-28 sm:size-32 rounded-xl bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 animate-pulse"></div>
-                                    <div className="size-28 sm:size-32 rounded-xl bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 animate-pulse"></div>
+                                    <div className="w-16 sm:w-24 text-right"><div className="h-3 w-12 bg-gray-200 dark:bg-gray-700/50 rounded ml-auto animate-pulse"></div></div>
+                                    <div className="size-20 sm:size-32 rounded-xl bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 animate-pulse"></div>
+                                    <div className="size-20 sm:size-32 rounded-xl bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 animate-pulse"></div>
                                 </div>
                             ))}
                         </div>
                     ) : (
                         /* Grid Content */
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-2 sm:gap-3">
                             {model.cm.map((row: any, rIdx: number) => (
-                                <div key={rIdx} className="grid grid-cols-[auto_1fr_1fr] gap-3 items-center">
+                                <div key={rIdx} className="grid grid-cols-[auto_1fr_1fr] gap-2 sm:gap-3 items-center">
                                     {/* Row Label */}
-                                    <div className="w-24 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider pr-2">
+                                    <div className="w-16 sm:w-24 text-right text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider pr-2 truncate">
                                         {row.actual}
                                     </div>
 
@@ -974,19 +977,19 @@ const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
                                                 onMouseEnter={() => setHoveredCell({ r: rIdx, c: cIdx })}
                                                 onMouseLeave={() => setHoveredCell(null)}
                                                 className={`
-                                        size-28 sm:size-32 rounded-xl flex flex-col items-center justify-center 
+                                        size-20 sm:size-32 rounded-xl flex flex-col items-center justify-center 
                                         shadow-sm border transition-all duration-200 cursor-pointer
                                         ${bgClass} ${textClass} ${borderClass}
                                         ${isHovered ? 'scale-105 shadow-lg z-10 ring-2 ring-offset-2 ring-offset-[#101622] ring-current' : ''}
                                         ${isDimmed ? 'opacity-40 grayscale' : 'opacity-100'}
                                     `}
                                             >
-                                                <span className="text-3xl font-black">{val}</span>
-                                                <span className={`text-[10px] uppercase font-bold mt-2 px-2 py-0.5 rounded-full ${isDiag ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-gray-800 text-slate-500'}`}>
-                                                    {rIdx === 0 && cIdx === 0 ? 'True Pos' : ''}
-                                                    {rIdx === 0 && cIdx === 1 ? 'False Neg' : ''}
-                                                    {rIdx === 1 && cIdx === 0 ? 'False Pos' : ''}
-                                                    {rIdx === 1 && cIdx === 1 ? 'True Neg' : ''}
+                                                <span className="text-xl sm:text-3xl font-black">{val}</span>
+                                                <span className={`text-[8px] sm:text-[10px] uppercase font-bold mt-1 sm:mt-2 px-1.5 sm:px-2 py-0.5 rounded-full ${isDiag ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-gray-800 text-slate-500'}`}>
+                                                    {rIdx === 0 && cIdx === 0 ? 'TP' : ''}
+                                                    {rIdx === 0 && cIdx === 1 ? 'FN' : ''}
+                                                    {rIdx === 1 && cIdx === 0 ? 'FP' : ''}
+                                                    {rIdx === 1 && cIdx === 1 ? 'TN' : ''}
                                                 </span>
                                             </div>
                                         );
@@ -997,7 +1000,7 @@ const InteractiveConfusionMatrix = ({ model }: { model: any }) => {
                     )}
 
                     {/* X-Axis Label Bottom */}
-                    <div className="text-center mt-4 text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase pl-24">
+                    <div className="text-center mt-2 sm:mt-4 text-[8px] sm:text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase pl-16 sm:pl-24">
                         Predicted Label
                     </div>
                 </div>

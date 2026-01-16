@@ -28,6 +28,10 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '1'
     id: 'Deploy Backend'
 
   # ==========================================

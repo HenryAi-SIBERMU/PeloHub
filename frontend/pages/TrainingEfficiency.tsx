@@ -151,28 +151,34 @@ const TrainingEfficiency: React.FC = () => {
                 <div className={`lg:col-span-2 bg-white dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col`}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-lg text-slate-900 dark:text-white">Duration Comparison</h3>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lower is Better</span>
                     </div>
 
-                    <div className="flex-1 flex items-end justify-around gap-4 relative px-4 min-h-[300px]">
-                        {/* Grid Lines */}
-                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 z-0 h-full pb-8">
-                            {[...Array(5)].map((_, i) => <div key={i} className="w-full border-t border-dashed border-gray-400"></div>)}
-                            <div className="w-full border-b border-gray-400"></div>
-                        </div>
-
+                    <div className="flex flex-col gap-5 justify-center min-h-[300px]">
                         {models.map((m: any, idx: number) => {
-                            // Height relative to slowest (max time)
+                            // Width relative to slowest (max time)
                             const slowest = isSkeleton ? models[0] : displayData.loser;
-                            // If skeleton, make bars random ish or fixed
                             const pct = isSkeleton ? (idx + 1) * 20 + 20 : Math.max(5, (m.time / slowest.time) * 100);
 
                             return (
-                                <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full z-10 group cursor-pointer transition-all duration-500">
-                                    <div className={`w-full max-w-[80px] rounded-t-lg relative ${m.isWinner && !isSkeleton ? 'bg-gradient-to-t from-primary to-blue-400 shadow-lg shadow-primary/30' : 'bg-slate-200 dark:bg-gray-700'}`} style={{ height: `${pct}%` }}>
-                                        {m.isWinner && !isSkeleton && <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-primary text-white text-xs font-bold py-1 px-3 rounded-full whitespace-nowrap shadow-md">Winner</div>}
+                                <div key={idx} className="flex flex-col gap-1 w-full group">
+                                    <div className="flex justify-between items-end mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs font-bold uppercase tracking-wider ${m.isWinner ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                {m.name}
+                                            </span>
+                                            {m.isWinner && !isSkeleton && <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded">WINNER</span>}
+                                        </div>
+                                        <span className="text-sm font-mono font-medium text-slate-900 dark:text-white">{isSkeleton ? '...' : fmtTime(m.time)}</span>
                                     </div>
-                                    <span className={`mt-4 text-xs font-bold uppercase tracking-wider text-center ${m.isWinner ? 'text-primary' : 'text-slate-500'}`}>{m.name.replace('EfficientNet', 'EffNet')}</span>
-                                    <span className="text-sm font-mono font-medium text-slate-900 dark:text-white">{isSkeleton ? '...' : fmtTime(m.time)}</span>
+                                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-8 overflow-hidden relative">
+                                        <div
+                                            className={`h-full rounded-full flex items-center px-3 transition-all duration-1000 ${m.isWinner && !isSkeleton ? 'bg-primary shadow-lg shadow-primary/30' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                            style={{ width: `${pct}%` }}
+                                        >
+                                            <span className="text-[10px] font-bold text-white/90 whitespace-nowrap drop-shadow-md">{pct.toFixed(0)}%</span>
+                                        </div>
+                                    </div>
                                 </div>
                             );
                         })}
