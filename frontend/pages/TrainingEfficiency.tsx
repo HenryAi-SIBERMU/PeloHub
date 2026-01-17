@@ -1,27 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useCachedFetch } from '../hooks/useCachedFetch';
 import { useNavigate } from 'react-router-dom';
 
 // --- HELPER HOOK (Similar to ModelEvaluation) ---
 const useEvaluationData = () => {
-    const [data, setData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchIt = async () => {
-            try {
-                const res = await fetch('/api/evaluation/details');
-                const json = await res.json();
-                setData(json);
-            } catch (e) {
-                console.error("Efficiency Fetch Error:", e);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchIt();
-    }, []);
-
-    return { data, loading };
+    // Use same cache key as ModelEvaluation to share data
+    return useCachedFetch('/api/evaluation/details', 'EVALUATION_CACHE_V2');
 };
 
 const TrainingEfficiency: React.FC = () => {

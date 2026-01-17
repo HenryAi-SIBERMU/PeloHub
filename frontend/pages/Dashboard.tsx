@@ -1,29 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useCachedFetch } from '../hooks/useCachedFetch';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
 
-    // State for real data
-    const [data, setData] = React.useState<any>(null);
-    const [loading, setLoading] = React.useState(true);
-
-    React.useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const response = await fetch('/api/engine/overview');
-                const json = await response.json();
-                setData(json);
-            } catch (error) {
-                console.error("Failed to fetch dashboard data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+    // State for real data (Cached)
+    const { data, loading } = useCachedFetch('/api/engine/overview', 'DASHBOARD_CACHE_V2');
 
     // Fallback defaults if loading or error
     const metrics = data?.metrics_summary || {

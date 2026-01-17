@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useCachedFetch } from '../hooks/useCachedFetch';
 import { useNavigate } from 'react-router-dom';
 
 // --- TYPE DEFINITIONS ---
@@ -43,104 +44,112 @@ const generateCurveData = (quality: 'high' | 'mid' | 'low', type: 'roc' | 'pr'):
 // --- API DATA FETCHING ---
 // --- API DATA FETCHING ---
 const useEvaluationData = (selectedDataset: string) => {
+    // 1. Fetch Data (Cached)
+    const { data: rawJson, loading: rawLoading } = useCachedFetch('/api/evaluation/details', 'EVALUATION_CACHE_V2');
+
+    // 2. Transform State
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const res = await fetch('/api/evaluation/details');
-                const json = await res.json();
+        if (!rawJson) return;
 
-                // Debug log
-                console.log("Evaluation details:", json);
+        const transform = () => {
+            const json = rawJson; // Alias for easier refactor
 
-                // Transform API Data to UI Format
-                const transformed: Record<string, any> = {};
+            // Debug log (Optional, can remove or keep)
+            // console.log("Evaluation details (Cached):", json);
 
-                // Helper to find model in summary list
-                const findSummary = (key: string) => json.summary.find((s: any) =>
-                    s.dataset.toLowerCase() === selectedDataset.toLowerCase() &&
-                    s.model.toLowerCase().includes(key)
-                );
-                // Helper to find efficiency
-                const findEff = (name: string) => {
-                    // Try partial match on keys
-                    const key = Object.keys(json.efficiency || {}).find(k => k.toLowerCase().includes(name.toLowerCase()));
-                    return key ? json.efficiency[key] : null;
-                };
+            // Transform API Data to UI Format
+            const transformed: Record<string, any> = {};
 
-                // Define Models to Map
-                const mapModel = (id: string, name: string, badge: string, color: string, stroke: string, bg: string, searchKey: string) => {
-                    const summ = findSummary(searchKey) || {};
-                    const eff = findEff(searchKey === 'cnn_stft' ? 'CNN-STFT' : searchKey) || {}; // Handle special naming if needed
+            // Helper to find model in summary list
+            const findSummary = (key: string) => json.summary.find((s: any) =>
+                s.dataset.toLowerCase() === selectedDataset.toLowerCase() &&
+                s.model.toLowerCase().includes(key)
+            );
+            // Helper to find efficiency
+            const findEff = (name: string) => {
+                // Try partial match on keys
+                const key = Object.keys(json.efficiency || {}).find(k => k.toLowerCase().includes(name.toLowerCase()));
+                return key ? json.efficiency[key] : null;
+            };
 
-                    // Match detail keys like "cnn_stft_UASpeech"
-                    const detailsKey = Object.keys(json.details || {}).find(k =>
-                        k.toLowerCase().includes(searchKey.toLowerCase()) &&
-                        k.toLowerCase().includes(selectedDataset.toLowerCase())
-                    ) || "";
+            // Define Models to Map
+            const mapModel = (id: string, name: string, badge: string, color: string, stroke: string, bg: string, searchKey: string) => {
+                const summ = findSummary(searchKey) || {};
+                const eff = findEff(searchKey === 'cnn_stft' ? 'CNN-STFT' : searchKey) || {}; // Handle special naming if needed
 
-                    const details = json.details?.[detailsKey] || {};
+                // Match detail keys like "cnn_stft_UASpeech"
+                const detailsKey = Object.keys(json.details || {}).find(k =>
+                    k.toLowerCase().includes(searchKey.toLowerCase()) &&
+                    k.toLowerCase().includes(selectedDataset.toLowerCase())
+                ) || "";
 
-                    return {
-                        id, name, badge, color, strokeColor: stroke, bgColor: bg, badgeColor: bg.replace('bg-', 'bg-').replace('500', '100') + ' text-' + color.split('-')[1] + '-800',
-                        metrics: {
-                            acc: summ.accuracy ? (summ.accuracy * 100).toFixed(1) + '%' : 'N/A',
-                            f1: details.classification_report?.['macro avg']?.['f1-score']?.toFixed(3) || 'N/A',
-                            prec: details.classification_report?.['macro avg']?.['precision']?.toFixed(3) || 'N/A',
-                            rec: details.classification_report?.['macro avg']?.['recall']?.toFixed(3) || 'N/A',
-                            auroc: details.auroc?.toFixed(3) || 'N/A',
-                            inference: summ.inference_time_ms ? summ.inference_time_ms.toFixed(1) + 'ms' : 'N/A'
+                const details = json.details?.[detailsKey] || {};
+
+                return {
+                    id, name, badge, color, strokeColor: stroke, bgColor: bg, badgeColor: bg.replace('bg-', 'bg-').replace('500', '100') + ' text-' + color.split('-')[1] + '-800',
+                    metrics: {
+                        acc: summ.accuracy ? (summ.accuracy * 100).toFixed(1) + '%' : 'N/A',
+                        f1: details.classification_report?.['macro avg']?.['f1-score']?.toFixed(3) || 'N/A',
+                        prec: details.classification_report?.['macro avg']?.['precision']?.toFixed(3) || 'N/A',
+                        rec: details.classification_report?.['macro avg']?.['recall']?.toFixed(3) || 'N/A',
+                        auroc: details.auroc?.toFixed(3) || 'N/A',
+                        inference: summ.inference_time_ms ? summ.inference_time_ms.toFixed(1) + 'ms' : 'N/A'
+                    },
+                    efficiency: {
+                        params: eff.params ? (parseInt(eff.params.replace(/,/g, '')) / 1e6).toFixed(1) + 'M' : "N/A",
+                        flops: eff.flops || "N/A",
+                        size: eff.size || "N/A",
+                        activation: eff.activation || "N/A"
+                    },
+                    cm: (details.confusion_matrix || details.cm) ? [
+                        { actual: 'Dysarthric', pred: [(details.confusion_matrix || details.cm)[1][1], (details.confusion_matrix || details.cm)[1][0]] }, // TP, FN (Label 1=Dysarthric)
+                        { actual: 'Control', pred: [(details.confusion_matrix || details.cm)[0][1], (details.confusion_matrix || details.cm)[0][0]] } // FP, TN (Label 0=Control)
+                    ] : [],
+                    rocData: details.roc || [],
+                    prData: details.pr || [],
+                    report: details.classification_report ? [
+                        {
+                            name: 'Dysarthric',
+                            p: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['precision']?.toFixed(3) || '0',
+                            r: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['recall']?.toFixed(3) || '0',
+                            f1: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['f1-score']?.toFixed(3) || '0'
                         },
-                        efficiency: {
-                            params: eff.params ? (parseInt(eff.params.replace(/,/g, '')) / 1e6).toFixed(1) + 'M' : "N/A",
-                            flops: eff.flops || "N/A",
-                            size: eff.size || "N/A",
-                            activation: eff.activation || "N/A"
-                        },
-                        cm: (details.confusion_matrix || details.cm) ? [
-                            { actual: 'Dysarthric', pred: [(details.confusion_matrix || details.cm)[1][1], (details.confusion_matrix || details.cm)[1][0]] }, // TP, FN (Label 1=Dysarthric)
-                            { actual: 'Control', pred: [(details.confusion_matrix || details.cm)[0][1], (details.confusion_matrix || details.cm)[0][0]] } // FP, TN (Label 0=Control)
-                        ] : [],
-                        rocData: details.roc || [],
-                        prData: details.pr || [],
-                        report: details.classification_report ? [
-                            {
-                                name: 'Dysarthric',
-                                p: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['precision']?.toFixed(3) || '0',
-                                r: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['recall']?.toFixed(3) || '0',
-                                f1: (details.classification_report['dysarthric'] || details.classification_report['1'])?.['f1-score']?.toFixed(3) || '0'
-                            },
-                            {
-                                name: 'Non-Dysarthric',
-                                p: (details.classification_report['control'] || details.classification_report['0'])?.['precision']?.toFixed(3) || '0',
-                                r: (details.classification_report['control'] || details.classification_report['0'])?.['recall']?.toFixed(3) || '0',
-                                f1: (details.classification_report['control'] || details.classification_report['0'])?.['f1-score']?.toFixed(3) || '0'
-                            }
-                        ] : [],
-                        history: details.history || []
-                    };
+                        {
+                            name: 'Non-Dysarthric',
+                            p: (details.classification_report['control'] || details.classification_report['0'])?.['precision']?.toFixed(3) || '0',
+                            r: (details.classification_report['control'] || details.classification_report['0'])?.['recall']?.toFixed(3) || '0',
+                            f1: (details.classification_report['control'] || details.classification_report['0'])?.['f1-score']?.toFixed(3) || '0'
+                        }
+                    ] : [],
+                    history: details.history || []
                 };
+            };
 
-                transformed['cnn'] = mapModel('cnn', 'CNN-STFT v2', 'Lightweight', 'text-primary', '#135bec', 'bg-primary', 'cnn_stft');
-                transformed['mobilenet'] = mapModel('mobilenet', 'MobileNetV3Small', 'EfficientNet', 'text-emerald-500', '#10b981', 'bg-emerald-500', 'mobilenetv3');
-                transformed['resnet'] = mapModel('resnet', 'EfficientNetB0', 'Transfer Learning', 'text-indigo-500', '#6366f1', 'bg-indigo-500', 'efficientnetb0');
-                // Use NASNetMobile instead of VGG
-                transformed['vgg'] = mapModel('vgg', 'NASNetMobile', 'Benchmark', 'text-purple-500', '#a855f7', 'bg-purple-500', 'nasnetmobile');
+            transformed['cnn'] = mapModel('cnn', 'CNN-STFT v2', 'Lightweight', 'text-primary', '#135bec', 'bg-primary', 'cnn_stft');
+            transformed['mobilenet'] = mapModel('mobilenet', 'MobileNetV3Small', 'EfficientNet', 'text-emerald-500', '#10b981', 'bg-emerald-500', 'mobilenetv3');
+            transformed['resnet'] = mapModel('resnet', 'EfficientNetB0', 'Transfer Learning', 'text-indigo-500', '#6366f1', 'bg-indigo-500', 'efficientnetb0');
+            // Use NASNetMobile instead of VGG
+            transformed['vgg'] = mapModel('vgg', 'NASNetMobile', 'Benchmark', 'text-purple-500', '#a855f7', 'bg-purple-500', 'nasnetmobile');
 
-                setData(transformed);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
+            setData(transformed);
+            setLoading(false);
         };
-        fetchData();
-    }, [selectedDataset]);
 
-    return { data, loading };
+        transform();
+    }, [rawJson, selectedDataset]);
+
+    // Ensure loading is true if we have no data yet (even if rawLoading is false, e.g. initial render before effect)
+    // Actually, if rawLoading is false and we have rawJson, we will set data in effect immediately.
+    // Ideally we'd structure this better, but this works:
+    // Sync loading state with rawLoading only if we don't have data.
+    useEffect(() => {
+        if (rawLoading) setLoading(true);
+    }, [rawLoading]);
+
+    return { data, loading: loading && !data }; // If we have data (from cache), we are not "loading" visually
 };
 
 const ModelEvaluation: React.FC = () => {
